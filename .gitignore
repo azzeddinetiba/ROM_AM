@@ -114,4 +114,5 @@ dmypy.json
 .pyre/
 
 # Data Files
-DATA/
+DATA/*
+!DATA/.gitkeep 
