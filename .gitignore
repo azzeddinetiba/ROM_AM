@@ -114,4 +114,4 @@ dmypy.json
 .pyre/
 
 # Data Files
-.DATA/
+DATA/
