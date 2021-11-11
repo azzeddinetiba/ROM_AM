@@ -26,8 +26,8 @@ class ROM:
             u, s, vh = self._pod_decompose(X, alg, rank)
 
         elif self.rom == "dmd":
-            u, s, vh, lambd, phi = self._dmd_decompose(X, Y, dt, rank)
-            omega = np.log(lambd)/dt
+            u, s, vh, lambd, phi = self._dmd_decompose(X, Y, rank)
+            omega = np.log(lambd) / dt
 
             self.dmd_modes = phi
             self.eigenvalues = omega
@@ -36,7 +36,7 @@ class ROM:
         self.modes = u
         self.time = vh
 
-    def _dmd_decompose(X, Y, dt, rank=0):
+    def _dmd_decompose(self, X, Y, rank=0):
 
         if os_ == 0:
             u, s, vh = jnp.linalg.svd(X, False)
@@ -45,11 +45,11 @@ class ROM:
 
         s_inv = np.zeros(s.shape)
         s_inv[s > 1e-10] = 1 / s[s > 1e-10]
-        A_tilde = np.linalg.multi_dot((u.T, Y, vh.T, s_inv))
+        A_tilde = np.linalg.multi_dot((u.T, Y, vh.T, np.diag(s_inv)))
 
         lambd, w = np.linalg.eig(A_tilde)
 
-        phi = np.linalg.multi_dot((Y, vh.T, s_inv, w))
+        phi = np.linalg.multi_dot((Y, vh.T, np.diag(s_inv), w))
 
         return u, s, vh, lambd, phi
 
