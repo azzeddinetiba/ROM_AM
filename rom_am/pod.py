@@ -30,6 +30,7 @@ class ROM:
             omega = np.log(lambd) / dt
 
             self.dmd_modes = phi
+            self.lambd = lambd
             self.eigenvalues = omega
 
         self.singvals = s
@@ -43,13 +44,25 @@ class ROM:
         else:
             u, s, vh = sp.svd(X, False)
 
+        if rank == 0:
+            # rank = len(s)
+            rank = len(s[s > 1e-10])
+
+        u = u[:, :rank]
+        vh = vh[:rank, :]
+        s = s[:rank]
+
         s_inv = np.zeros(s.shape)
         s_inv[s > 1e-10] = 1 / s[s > 1e-10]
-        A_tilde = np.linalg.multi_dot((u.T, Y, vh.T, np.diag(s_inv)))
+        store = np.linalg.multi_dot((Y, vh.T, np.diag(s_inv)))
+        A_tilde = u.T @ store
 
         lambd, w = np.linalg.eig(A_tilde)
+        idx = lambd.argsort()[::-1]
+        lambd = lambd[idx]
+        w = w[:, idx]
 
-        phi = np.linalg.multi_dot((Y, vh.T, np.diag(s_inv), w))
+        phi = store @ w
 
         return u, s, vh, lambd, phi
 
@@ -97,3 +110,9 @@ class ROM:
             rank = len(self.singvals)
 
         return (self.modes[:, :rank] * self.singvals[:rank]) @ self.time[:rank, :]
+
+    def dmd_predict(self, t, init):
+
+        # np.linalg.lstsq(dmd.modes, init)
+        b = np.linalg.pinv((self.dmd_modes)) @ init
+        return self.dmd_modes @ (np.exp(np.outer(self.eigenvalues, t).T) * b).T
