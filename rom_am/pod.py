@@ -113,6 +113,6 @@ class ROM:
 
     def dmd_predict(self, t, init):
 
-        # np.linalg.lstsq(dmd.modes, init)
-        b = np.linalg.pinv((self.dmd_modes)) @ init
+        b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
+
         return self.dmd_modes @ (np.exp(np.outer(self.eigenvalues, t).T) * b).T
