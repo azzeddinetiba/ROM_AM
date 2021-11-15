@@ -20,7 +20,9 @@ class ROM:
     def decompose(self, X, Y=None, dt=None, center=False, alg="svd", rank=0):
 
         if center:
-            X -= X.mean(axis=1).reshape((-1, 1))
+            self.mean_flow = X.mean(axis=1)
+            X -= self.mean_flow.reshape((-1, 1))
+            
 
         if self.rom == "pod":
             u, s, vh = self._pod_decompose(X, alg, rank)
