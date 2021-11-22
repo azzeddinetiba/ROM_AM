@@ -60,7 +60,7 @@ class ROM:
         A_tilde = u.T @ store
 
         lambd, w = np.linalg.eig(A_tilde)
-        idx = lambd.argsort()[::-1]
+        idx = np.abs(np.imag(lambd)).argsort()
         lambd = lambd[idx]
         w = w[:, idx]
 
