@@ -17,18 +17,24 @@ class ROM:
 
         self.rom = rom
 
-    def decompose(self, X, Y=None, dt=None, center=False, alg="svd", rank=0):
+    def decompose(self, X, Y=None, Y_input=None, dt=None, center=False, alg="svd", rank=0):
 
         if center:
             self.mean_flow = X.mean(axis=1)
             X -= self.mean_flow.reshape((-1, 1))
-            
 
         if self.rom == "pod":
             u, s, vh = self._pod_decompose(X, alg, rank)
 
-        elif self.rom == "dmd":
-            u, s, vh, lambd, phi = self._dmd_decompose(X, Y, rank)
+        else:
+            if self.rom == "dmd":
+                u, s, vh, lambd, phi = self._dmd_decompose(X, Y, rank)
+            elif self.rom == "dmdc":
+                u_til_1, u_til_2, s_til, vh_til, lambd, phi = self._dmdc_decompose(X, Y, Y_input, rank)
+                u = u_til_1
+                vh = vh_til
+                s = s_til
+
             omega = np.log(lambd) / dt
 
             self.dmd_modes = phi
@@ -57,9 +63,9 @@ class ROM:
         s_inv = np.zeros(s.shape)
         s_inv[s > 1e-10] = 1 / s[s > 1e-10]
         store = np.linalg.multi_dot((Y, vh.T, np.diag(s_inv)))
-        A_tilde = u.T @ store
+        self.A_tilde = u.T @ store
 
-        lambd, w = np.linalg.eig(A_tilde)
+        lambd, w = np.linalg.eig(self.A_tilde)
         idx = np.abs(np.imag(lambd)).argsort()
         lambd = lambd[idx]
         w = w[:, idx]
@@ -67,6 +73,46 @@ class ROM:
         phi = store @ w
 
         return u, s, vh, lambd, phi
+
+    def _dmdc_decompose(self, X, Y, Y_input, rank_til=0, rank_hat=0):
+
+        omega = np.vstack((X, Y_input))
+        if os_ == 0:
+            u_til, s_til, vh_til = jnp.linalg.svd(omega, False)
+            u_hat, _, _ = jnp.linalg.svd(Y, False)
+        else:
+            u_til, s_til, vh_til = sp.svd(omega, False)
+            u_hat, s_hat, _ = sp.svd(Y, False)
+
+        if rank_til == 0:
+            # rank = len(s)
+            rank_til = len(s_til[s_til > 1e-10])
+            rank_hat = len(s_hat[s_hat > 1e-10])
+
+        u_til = u_til[:, :rank_til]
+        vh_til = vh_til[:rank_til, :]
+        s_til = s_til[:rank_til]
+        u_til_1 = u_til[:X.shape[0], :]
+        u_til_2 = u_til[:Y_input.shape[0], :]
+
+        u_hat = u_hat[:, :rank_hat]
+
+        s_inv = np.zeros(s_til.shape)
+        s_inv[s_til > 1e-10] = 1 / s_til[s_til > 1e-10]
+
+        store_ = np.linalg.multi_dot((Y, vh_til.T, np.diag(s_inv)))
+        store = np.linalg.multi_dot((u_hat.T, store_))
+        self.A_tilde = np.linalg.multi_dot((store, u_til_1.T, u_hat))
+        self.B_tilde = np.linalg.multi_dot((store, u_til_2.T))
+
+        lambd, w = np.linalg.eig(self.A_tilde)
+        idx = np.abs(np.imag(lambd)).argsort()
+        lambd = lambd[idx]
+        w = w[:, idx]
+
+        phi = np.linalg.multi_dot((store_, u_til_1.T, u_hat, w))
+
+        return u_til_1, u_til_2, s_til, vh_til, lambd, phi
 
     def _pod_decompose(self, X, alg, rank=0):
 
