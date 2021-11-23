@@ -78,8 +78,9 @@ class ROM:
 
         omega = np.vstack((X, Y_input))
         if os_ == 0:
+            jax.config.update("jax_enable_x64", True)
             u_til, s_til, vh_til = jnp.linalg.svd(omega, False)
-            u_hat, _, _ = jnp.linalg.svd(Y, False)
+            u_hat, s_hat, _ = jnp.linalg.svd(Y, False)
         else:
             u_til, s_til, vh_til = sp.svd(omega, False)
             u_hat, s_hat, _ = sp.svd(Y, False)
