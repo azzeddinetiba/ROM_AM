@@ -30,7 +30,8 @@ class ROM:
             if self.rom == "dmd":
                 u, s, vh, lambd, phi = self._dmd_decompose(X, Y, rank)
             elif self.rom == "dmdc":
-                u_til_1, u_til_2, s_til, vh_til, lambd, phi = self._dmdc_decompose(X, Y, Y_input, rank)
+                u_til_1, u_til_2, s_til, vh_til, lambd, phi = self._dmdc_decompose(
+                    X, Y, Y_input, rank)
                 u = u_til_1
                 vh = vh_til
                 s = s_til
@@ -81,6 +82,12 @@ class ROM:
             jax.config.update("jax_enable_x64", True)
             u_til, s_til, vh_til = jnp.linalg.svd(omega, False)
             u_hat, s_hat, _ = jnp.linalg.svd(Y, False)
+            u_til = np.array(u_til)
+            s_til = np.array(s_til)
+            vh_til = np.array(vh_til)
+            u_hat = np.array(u_hat)
+            s_hat = np.array(s_hat)
+
         else:
             u_til, s_til, vh_til = sp.svd(omega, False)
             u_hat, s_hat, _ = sp.svd(Y, False)
