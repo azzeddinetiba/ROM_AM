@@ -118,3 +118,4 @@ DATA/*
 !DATA/.gitkeep 
 
 .idea/
+*.DS_Store

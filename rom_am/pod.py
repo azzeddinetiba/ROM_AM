@@ -17,7 +17,7 @@ class ROM:
 
         self.rom = rom
 
-    def decompose(self, X, Y=None, Y_input=None, dt=None, center=False, alg="svd", rank=0):
+    def decompose(self, X, Y=None, Y_input=None, dt=None, center=False, alg="svd", rank=0, sorting="abs"):
 
         if center:
             self.mean_flow = X.mean(axis=1)
@@ -28,7 +28,8 @@ class ROM:
 
         else:
             if self.rom == "dmd":
-                u, s, vh, lambd, phi = self._dmd_decompose(X, Y, rank)
+                u, s, vh, lambd, phi = self._dmd_decompose(
+                    X, Y, rank, sorting=sorting)
             elif self.rom == "dmdc":
                 u_til_1, u_til_2, s_til, vh_til, lambd, phi = self._dmdc_decompose(
                     X, Y, Y_input, rank)
@@ -46,7 +47,7 @@ class ROM:
         self.modes = u
         self.time = vh
 
-    def _dmd_decompose(self, X, Y, rank=0):
+    def _dmd_decompose(self, X, Y, rank=0, sorting="abs"):
 
         if os_ == 0:
             u, s, vh = jnp.linalg.svd(X, False)
@@ -67,7 +68,11 @@ class ROM:
         self.A_tilde = u.T @ store
 
         lambd, w = np.linalg.eig(self.A_tilde)
-        idx = np.abs(np.imag(lambd)).argsort()
+
+        if sorting == "abs":
+            idx = (np.abs(lambd)).argsort()[::-1]
+        else:
+            idx = (np.real(lambd)).argsort()[::-1]
         lambd = lambd[idx]
         w = w[:, idx]
 
