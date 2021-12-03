@@ -17,7 +17,11 @@ class ROM:
 
         self.rom = rom
 
+<<<<<<< Updated upstream
     def decompose(self, X, Y=None, Y_input=None, dt=None, center=False, alg="svd", rank=0):
+=======
+    def decompose(self, X, Y=None, dt=None, center=False, alg="svd", rank=0):
+>>>>>>> Stashed changes
 
         if center:
             self.mean_flow = X.mean(axis=1)
@@ -126,6 +130,39 @@ class ROM:
         phi = np.linalg.multi_dot((store_, u_til_1.T, u_hat, w))
 
         return u_til_1, u_til_2, s_til, vh_til, lambd, phi
+
+    def _pod_decompose(self, X, alg, rank=0):
+
+        if self.rom == "pod":
+            u, s, vh = self._pod_decompose(X, alg, rank)
+
+        elif self.rom == "dmd":
+            u, s, vh, lambd, phi = self._dmd_decompose(X, Y, dt, rank)
+            omega = np.log(lambd)/dt
+
+            self.dmd_modes = phi
+            self.eigenvalues = omega
+
+        self.singvals = s
+        self.modes = u
+        self.time = vh
+
+    def _dmd_decompose(X, Y, dt, rank=0):
+
+        if os_ == 0:
+            u, s, vh = jnp.linalg.svd(X, False)
+        else:
+            u, s, vh = sp.svd(X, False)
+
+        s_inv = np.zeros(s.shape)
+        s_inv[s > 1e-10] = 1 / s[s > 1e-10]
+        A_tilde = np.linalg.multi_dot((u.T, Y, vh.T, s_inv))
+
+        lambd, w = np.linalg.eig(A_tilde)
+
+        phi = np.linalg.multi_dot((Y, vh.T, s_inv, w))
+
+        return u, s, vh, lambd, phi
 
     def _pod_decompose(self, X, alg, rank=0):
 
