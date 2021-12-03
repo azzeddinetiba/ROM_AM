@@ -50,6 +50,9 @@ class ROM:
 
         if os_ == 0:
             u, s, vh = jnp.linalg.svd(X, False)
+            u = np.array(u)
+            s = np.array(s)
+            vh = np.array(vh)
         else:
             u, s, vh = sp.svd(X, False)
 
@@ -70,6 +73,7 @@ class ROM:
         idx = np.abs(np.imag(lambd)).argsort()
         lambd = lambd[idx]
         w = w[:, idx]
+        self.low_dim_eig = w
 
         phi = store @ w
 
@@ -117,6 +121,7 @@ class ROM:
         idx = np.abs(np.imag(lambd)).argsort()
         lambd = lambd[idx]
         w = w[:, idx]
+        self.low_dim_eig = w
 
         phi = np.linalg.multi_dot((store_, u_til_1.T, u_hat, w))
 
@@ -127,6 +132,9 @@ class ROM:
         if alg == "svd":
             if os_ == 0:
                 u, s, vh = jnp.linalg.svd(X, False)
+                u = np.array(u)
+                s = np.array(s)
+                vh = np.array(vh)
             else:
                 u, s, vh = sp.svd(X, False)
 
@@ -169,6 +177,8 @@ class ROM:
 
     def dmd_predict(self, t, init):
 
-        b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
+        # b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
+        alpha1 = self.singvals * self.time[:, 0]
+        b = np.linalg.solve(self.lambd * self.low_dim_eig, alpha1)
 
         return self.dmd_modes @ (np.exp(np.outer(self.eigenvalues, t).T) * b).T
