@@ -179,7 +179,7 @@ class ROM:
 
         return (self.modes[:, :rank] * self.singvals[:rank]) @ self.time[:rank, :]
 
-    def dmd_predict(self, t, init):
+    def dmd_predict(self, t, init = 0):
 
         # b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
         alpha1 = self.singvals * self.time[:, 0]
