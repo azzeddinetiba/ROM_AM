@@ -50,6 +50,9 @@ class ROM:
     def _dmd_decompose(self, X, Y, rank=0, sorting="abs"):
 
         if os_ == 0:
+
+            jax.config.update("jax_enable_x64", True)
+
             u, s, vh = jnp.linalg.svd(X, False)
             u = np.array(u)
             s = np.array(s)
@@ -179,10 +182,11 @@ class ROM:
 
         return (self.modes[:, :rank] * self.singvals[:rank]) @ self.time[:rank, :]
 
-    def dmd_predict(self, t, init = 0, t1 = 0):
+    def dmd_predict(self, t, init=0, t1=0):
 
         # b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
         alpha1 = self.singvals * self.time[:, 0]
-        b = (1 / np.exp(self.eigenvalues * t1)) * np.linalg.solve(self.lambd * self.low_dim_eig, alpha1)
+        b = (1 / np.exp(self.eigenvalues * t1)) * \
+            np.linalg.solve(self.lambd * self.low_dim_eig, alpha1)
 
         return self.dmd_modes @ (np.exp(np.outer(self.eigenvalues, (t - t1)).T) * b).T
