@@ -186,7 +186,7 @@ class ROM:
 
         # b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
         alpha1 = self.singvals * self.time[:, 0]
-        b = (1 / np.exp(self.eigenvalues * t1)) * \
-            np.linalg.solve(self.lambd * self.low_dim_eig, alpha1)
+        b = np.linalg.solve(self.lambd * self.low_dim_eig,
+                            alpha1) / np.exp(self.eigenvalues * t1)
 
-        return self.dmd_modes @ (np.exp(np.outer(self.eigenvalues, (t - t1)).T) * b).T
+        return self.dmd_modes @ (np.exp(np.outer(self.eigenvalues, t).T) * b).T
