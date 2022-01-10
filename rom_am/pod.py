@@ -194,9 +194,8 @@ class ROM:
     def dmd_predict(self, t, init=0, t1=0, method=0):
 
         if method:
-            b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None) / np.exp(
-                self.eigenvalues * t1
-            )
+            b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
+            b /= np.exp(self.eigenvalues * t1)
         else:
             alpha1 = self.singvals * self.time[:, 0]
             b = np.linalg.solve(self.lambd * self.low_dim_eig, alpha1) / np.exp(
