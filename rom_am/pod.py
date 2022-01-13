@@ -39,6 +39,8 @@ class ROM:
         else:
             if self.rom == "dmd":
                 self.tikhonov = tikhonov
+                if self.tikhonov:
+                    self.x_cond = np.linalg.cond(X)
                 u, s, vh, lambd, phi = self._dmd_decompose(
                     X, Y, rank, sorting=sorting)
             elif self.rom == "dmdc":
@@ -85,7 +87,7 @@ class ROM:
         s_inv_ = s_inv.copy()
         if self.tikhonov:
             s_inv_[s > 1e-10] *= s[s > 1e-10]**2 / \
-                (s[s > 1e-10]**2 + self.tikhonov)
+                (s[s > 1e-10]**2 + self.tikhonov * self.x_cond)
         store = np.linalg.multi_dot((Y, vh.T, np.diag(s_inv_)))
         self.A_tilde = u.T @ store
 
