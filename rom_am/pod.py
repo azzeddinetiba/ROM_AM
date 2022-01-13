@@ -26,6 +26,7 @@ class ROM:
         alg="svd",
         rank=0,
         sorting="abs",
+        tikhonov=0,
     ):
 
         if center:
@@ -37,7 +38,9 @@ class ROM:
 
         else:
             if self.rom == "dmd":
-                u, s, vh, lambd, phi = self._dmd_decompose(X, Y, rank, sorting=sorting)
+                self.tikhonov = tikhonov
+                u, s, vh, lambd, phi = self._dmd_decompose(
+                    X, Y, rank, sorting=sorting)
             elif self.rom == "dmdc":
                 u_til_1, u_til_2, s_til, vh_til, lambd, phi = self._dmdc_decompose(
                     X, Y, Y_input, rank
@@ -79,7 +82,11 @@ class ROM:
 
         s_inv = np.zeros(s.shape)
         s_inv[s > 1e-10] = 1 / s[s > 1e-10]
-        store = np.linalg.multi_dot((Y, vh.T, np.diag(s_inv)))
+        s_inv_ = s_inv.copy()
+        if self.tikhonov:
+            s_inv_[s > 1e-10] *= s[s > 1e-10]**2 / \
+                (s[s > 1e-10]**2 + self.tikhonov)
+        store = np.linalg.multi_dot((Y, vh.T, np.diag(s_inv_)))
         self.A_tilde = u.T @ store
 
         lambd, w = np.linalg.eig(self.A_tilde)
