@@ -7,9 +7,9 @@ class DMDc:
         center=False,
         alg="svd",
         rank=0,
-        sorting="abs",
         opt_trunc=False,
         tikhonov=0,
+        sorting="abs",
         Y=None,
         dt=None,
         Y_input=None,):

@@ -18,7 +18,6 @@ class ROM:
         center=False,
         alg="svd",
         rank=0,
-        sorting="abs",
         opt_trunc=False,
         tikhonov=0,
         *args,
@@ -32,7 +31,6 @@ class ROM:
                                         center=center,
                                         alg=alg,
                                         rank=rank,
-                                        sorting=sorting,
                                         opt_trunc=opt_trunc,
                                         tikhonov=tikhonov,
                                         *args,
@@ -41,14 +39,6 @@ class ROM:
         self.singvals = s
         self.modes = u
         self.time = vh
-
-        # if self.rom == "dmdc":
-        #     u_til_1, u_til_2, s_til, vh_til, lambd, phi = self._dmdc_decompose(
-        #         X, Y, Y_input, rank
-        #     )
-        #     u = u_til_1
-        #     vh = vh_til
-        #     s = s_til
 
     def predict(self, t, init=0, t1=0, *args, **kwargs):
         return self.model.predict(t=t, init=init, t1=t1, *args, **kwargs)

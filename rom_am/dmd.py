@@ -1,4 +1,3 @@
-from tkinter import N
 import numpy as np
 from pod import *
 
@@ -12,17 +11,18 @@ class DMD:
 
         self.dt = None
         self.t1 = None
-        self.n_timesteps: None
+        self.n_timesteps = None
         self.tikhonov = None
+        self.x_cond = None
 
     def decompose(self,
                   X,
                   center=False,
                   alg="svd",
                   rank=0,
-                  sorting="abs",
                   opt_trunc=False,
                   tikhonov=0,
+                  sorting="abs",
                   Y=None,
                   dt=None,):
 
@@ -36,11 +36,10 @@ class DMD:
             X, alg, rank=rank, opt_trunc=opt_trunc, center=center)
 
         s_inv = np.zeros(s.shape)
-        s_inv[s > 1e-10] = 1 / s[s > 1e-10]
+        s_inv = 1 / s
         s_inv_ = s_inv.copy()
         if self.tikhonov:
-            s_inv_[s > 1e-10] *= s[s > 1e-10]**2 / \
-                (s[s > 1e-10]**2 + self.tikhonov * self.x_cond)
+            s_inv_ *= s**2 / (s**2 + self.tikhonov * self.x_cond)
         store = np.linalg.multi_dot((Y, vh.T, np.diag(s_inv_)))
         self.A_tilde = u.T @ store
 
