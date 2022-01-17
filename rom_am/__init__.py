@@ -1,2 +1,2 @@
-from .pod import ROM
+from .rom import ROM
 
