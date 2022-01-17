@@ -61,7 +61,7 @@ class ROM:
         self.modes = u
         self.time = vh
 
-    def _dmd_decompose(self, X, Y, rank=0, sorting="abs"):
+    def _dmd_decompose(self, X, Y, rank=0, opt_trunc = False, sorting="abs"):
 
         if os_ == 0:
 
@@ -74,9 +74,19 @@ class ROM:
         else:
             u, s, vh = sp.svd(X, False)
 
-        if rank == 0:
-            # rank = len(s)
-            rank = len(s[s > 1e-10])
+        if opt_trunc:
+            if X.shape[0] <= X.shape[1]:
+                beta = X.shape[0]
+            else:
+                beta = X.shape[1]
+            omega = 0.56 * beta**3 - 0.95 * beta**2 + 1.82 * beta + 1.43
+            tau = np.median(s) * omega
+            rank = np.sum(s > tau)
+        else:
+            if rank == 0:
+                rank = len(s[s > 1e-10])
+            elif 0 < rank < 1:
+                rank = np.searchsorted(np.cumsum(s**2 / (s**2).sum()), rank) + 1
 
         u = u[:, :rank]
         vh = vh[:rank, :]
@@ -152,7 +162,7 @@ class ROM:
 
         return u_til_1, u_til_2, s_til, vh_til, lambd, phi
 
-    def _pod_decompose(self, X, alg, rank=0):
+    def _pod_decompose(self, X, alg, rank=0, opt_trunc=False):
 
         if alg == "svd":
             if os_ == 0:
@@ -163,9 +173,20 @@ class ROM:
             else:
                 u, s, vh = sp.svd(X, False)
 
-            if rank == 0:
-                # rank = len(s)
-                rank = len(s[s > 1e-10])
+
+            if opt_trunc:
+                if X.shape[0] <= X.shape[1]:
+                    beta = X.shape[0]
+                else:
+                    beta = X.shape[1]
+                omega = 0.56 * beta**3 - 0.95 * beta**2 + 1.82 * beta + 1.43
+                tau = np.median(s) * omega
+                rank = np.sum(s > tau)
+            else:
+                if rank == 0:
+                    rank = len(s[s > 1e-10])
+                elif 0 < rank < 1:
+                    rank = np.searchsorted(np.cumsum(s**2 / (s**2).sum()), rank) + 1
 
             u = u[:, :rank]
             vh = vh[:rank, :]
