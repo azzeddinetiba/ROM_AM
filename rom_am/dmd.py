@@ -1,5 +1,5 @@
 import numpy as np
-from pod import *
+from .pod import *
 
 
 class DMD:
@@ -31,10 +31,13 @@ class DMD:
             self.x_cond = np.linalg.cond(X)
 
         self.n_timesteps = X.shape[1]
-        self.pod_ = POD
-        u, s, vh = self.pod_.decompose(
-            X, alg, rank=rank, opt_trunc=opt_trunc, center=center)
+        self.pod_ = POD()
+        self.pod_.decompose(X, alg=alg, rank=rank, opt_trunc=opt_trunc, center=center)
 
+        u = self.pod_.modes
+        vh = self.pod_.time
+        s = self.pod_.singvals
+        
         s_inv = np.zeros(s.shape)
         s_inv = 1 / s
         s_inv_ = s_inv.copy()
@@ -69,6 +72,7 @@ class DMD:
 
     def predict(self, t, init=0, t1=0, method=0):
 
+        self.t1 = t1
         if method:
             b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
             b /= np.exp(self.eigenvalues * t1)

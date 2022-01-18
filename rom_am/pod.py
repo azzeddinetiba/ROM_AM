@@ -13,6 +13,9 @@ if "linux" in sys.platform:
 
 
 class POD:
+    def __init__(self):
+        pass
+
     def decompose(self, X, center=False, alg="svd", rank=0, opt_trunc=False, tikhonov=0):
 
         if center:

@@ -3,9 +3,9 @@ import scipy.linalg as sp
 
 
 class ROM:
-    def __init__(self, rom):
+    def __init__(self, rom_object):
 
-        self.model = rom
+        self.model = rom_object
         self.snapshots = None
 
         self.singvals = None
@@ -13,21 +13,19 @@ class ROM:
         self.time = None
 
     def decompose(
-        self,
-        X,
-        center=False,
-        alg="svd",
-        rank=0,
-        opt_trunc=False,
-        tikhonov=0,
-        *args,
-        **kwargs,
-    ):
+            self,
+            X,
+            center=False,
+            alg="svd",
+            rank=0,
+            opt_trunc=False,
+            tikhonov=0,
+            *args,
+            **kwargs,):
 
         self.snapshots = X.copy()
 
-        u, s, vh = self.model.decompose(self,
-                                        X=self.snapshots,
+        u, s, vh = self.model.decompose(X=self.snapshots,
                                         center=center,
                                         alg=alg,
                                         rank=rank,
