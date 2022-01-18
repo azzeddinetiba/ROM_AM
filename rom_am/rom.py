@@ -41,5 +41,5 @@ class ROM:
     def predict(self, t, init=0, t1=0, *args, **kwargs):
         return self.model.predict(t=t, init=init, t1=t1, *args, **kwargs)
 
-    def reconstruct(self, rank):
+    def reconstruct(self, rank=None):
         return self.model.reconstruct(rank=rank)

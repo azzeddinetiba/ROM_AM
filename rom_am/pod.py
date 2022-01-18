@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.linalg as sp
 import sys
+import warnings
 
 os_ = 1
 if "linux" in sys.platform:
@@ -14,7 +15,7 @@ if "linux" in sys.platform:
 
 class POD:
     def __init__(self):
-        pass
+        self.kept_rank = None
 
     def decompose(self, X, center=False, alg="svd", rank=0, opt_trunc=False, tikhonov=0):
 
@@ -45,6 +46,7 @@ class POD:
                 elif 0 < rank < 1:
                     rank = np.searchsorted(
                         np.cumsum(s**2 / (s**2).sum()), rank) + 1
+            self.kept_rank = rank
 
             u = u[:, :rank]
             vh = vh[:rank, :]
@@ -78,9 +80,13 @@ class POD:
 
         return u, s, vh
 
-    def reconstruct(self, rank=0):
+    def reconstruct(self, rank=None):
 
-        if rank == 0:
-            rank = len(self.singvals)
+        if rank is None:
+            rank = self.kept_rank
+        elif not (isinstance(rank, int) and 0 < rank < self.kept_rank):
+            warnings.warn('The rank chosen for reconstruction should be an integer smaller than the\
+            rank chosen/computed at the decomposition phase. Please see the rank value by self.kept_rank')
+            rank = self.kept_rank
 
         return (self.modes[:, :rank] * self.singvals[:rank]) @ self.time[:rank, :]

@@ -14,6 +14,7 @@ class DMD:
         self.n_timesteps = None
         self.tikhonov = None
         self.x_cond = None
+        self._kept_rank = None
 
     def decompose(self,
                   X,
@@ -32,12 +33,14 @@ class DMD:
 
         self.n_timesteps = X.shape[1]
         self.pod_ = POD()
-        self.pod_.decompose(X, alg=alg, rank=rank, opt_trunc=opt_trunc, center=center)
+        self.pod_.decompose(X, alg=alg, rank=rank,
+                            opt_trunc=opt_trunc, center=center)
 
         u = self.pod_.modes
         vh = self.pod_.time
         s = self.pod_.singvals
-        
+        self._kept_rank = self.pod_.kept_rank
+
         s_inv = np.zeros(s.shape)
         s_inv = 1 / s
         s_inv_ = s_inv.copy()
@@ -84,9 +87,21 @@ class DMD:
 
         return self.dmd_modes @ (np.exp(np.outer(self.eigenvalues, t).T) * b).T
 
-    def reconstruct(self, rank):
+    def reconstruct(self, rank=None):
 
+        if rank is None:
+            rank = self._kept_rank
+        elif not (isinstance(rank, int) and 0 < rank < self.kept_rank):
+            warnings.warn('The rank chosen for reconstruction should be an integer smaller than the\
+            rank chosen/computed at the decomposition phase. Please see the rank value by self.kept_rank')
+            rank = self._kept_rank
+
+        if self.t1 is None:
+            self.t1 = 0
+            warnings.warn('the initial instant value was not assigned during the prediction phase,\
+                t1 is chosen as 0')
         t = np.linspace(self.t1, self.t1 + (self.n_timesteps - 1)
                         * self.dt, self.n_timesteps)
-        y0 = np.linalg.multi_dot((self.modes[:, :rank], np.diag(self.singvals[:rank]), self.time[:rank, 0]))
+        y0 = np.linalg.multi_dot((self.modes[:, :rank], np.diag(
+            self.singvals[:rank]), self.time[:rank, 0])).reshape((-1, 1))
         return np.hstack((y0, self.predict(t, t1=self.t1)))
