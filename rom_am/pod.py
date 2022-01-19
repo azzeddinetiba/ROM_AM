@@ -34,9 +34,9 @@ class POD:
 
             if opt_trunc:
                 if X.shape[0] <= X.shape[1]:
-                    beta = X.shape[0]
+                    beta = X.shape[0]/X.shape[1]
                 else:
-                    beta = X.shape[1]
+                    beta = X.shape[1]/X.shape[0]
                 omega = 0.56 * beta**3 - 0.95 * beta**2 + 1.82 * beta + 1.43
                 tau = np.median(s) * omega
                 rank = np.sum(s > tau)
