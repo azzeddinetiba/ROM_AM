@@ -114,7 +114,9 @@ dmypy.json
 .pyre/
 
 # Data Files
-DATA/*
+DATA/*/*.txt
+DATA/*.mat
+DATA/*/*.mat
 !DATA/.gitkeep 
 
 .idea/
