@@ -1,3 +1,4 @@
+from email.mime import image
 import numpy as np
 from .pod import *
 
@@ -73,7 +74,14 @@ class DMD:
 
         return u, s, vh
 
-    def predict(self, t, init=0, t1=0, method=0):
+    def predict(self, t, init=0, t1=0, method=0, rank=None, stabilize=False):
+
+        if rank is None:
+            rank = self._kept_rank
+        elif not (isinstance(rank, int) and 0 < rank < self.kept_rank):
+            warnings.warn('The rank chosen for prediction should be an integer smaller than the\
+            rank chosen/computed at the decomposition phase. Please see the rank value in self.kept_rank')
+            rank = self._kept_rank
 
         self.t1 = t1
         if method:
@@ -85,7 +93,11 @@ class DMD:
                 self.eigenvalues * t1
             )
 
-        return self.dmd_modes @ (np.exp(np.outer(self.eigenvalues, t).T) * b).T
+        eig = self.eigenvalues[:rank]
+        if stabilize:
+            eig[np.abs(self.lambd[:rank]) > 1].real = 0
+
+        return self.dmd_modes[:, :rank] @ (np.exp(np.outer(eig, t).T) * b[:rank]).T
 
     def reconstruct(self, rank=None):
 
@@ -93,7 +105,7 @@ class DMD:
             rank = self._kept_rank
         elif not (isinstance(rank, int) and 0 < rank < self.kept_rank):
             warnings.warn('The rank chosen for reconstruction should be an integer smaller than the\
-            rank chosen/computed at the decomposition phase. Please see the rank value by self.kept_rank')
+            rank chosen/computed at the decomposition phase. Please see the rank value in self.kept_rank')
             rank = self._kept_rank
 
         if self.t1 is None:

@@ -38,8 +38,8 @@ class ROM:
         self.modes = u
         self.time = vh
 
-    def predict(self, t, init=0, t1=0, *args, **kwargs):
-        return self.model.predict(t=t, init=init, t1=t1, *args, **kwargs)
+    def predict(self, t, init=0, t1=0, rank=None, *args, **kwargs):
+        return self.model.predict(t=t, init=init, t1=t1, rank=None, *args, **kwargs)
 
     def reconstruct(self, rank=None):
         return self.model.reconstruct(rank=rank)
