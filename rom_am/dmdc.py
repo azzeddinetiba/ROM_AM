@@ -1,5 +1,5 @@
 import numpy as np
-from .pod import *
+from .pod import POD
 
 
 class DMDc:
