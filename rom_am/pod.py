@@ -14,11 +14,58 @@ if "linux" in sys.platform:
 
 
 class POD:
+    """
+    Proper Orthogonal Decomposition Class
+
+    """
+
     def __init__(self):
         self.kept_rank = None
+        self.singvals = None
+        self.modes = None
+        self.time = None
 
     def decompose(self, X, center=False, alg="svd", rank=0, opt_trunc=False, tikhonov=0):
+        """Computes the proper orthogonal decomposition, training the model on the input data X.
 
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Snapshot matrix data, of (N, m) size 
+        center : bool, optional
+            Flag to either center the data around time or not
+            Default : False
+        alg : str, optional
+            Whether to use the SVD on decomposition ("svd") or
+            the eigenvalue problem on snaphot matrices ("snap")
+            Default : "svd"
+        rank : int or float, optional
+            if rank = 0 All the ranks are kept, unless their
+            singular values are zero
+            if 0 < rank < 1, it is used as the percentage of
+            the energy that should be kept, and the rank is
+            computed accordingly
+            Default : 0
+        opt_trunc : bool, optional
+            if True an optimal truncation/threshold is estimated,
+            based on the algorithm of Gavish and Donoho [1]
+            Default : False
+        tikhonov : int or float, optional
+            tikhonov parameter for regularization
+            If 0, no regularization is applied, if float, it is used as
+            the lambda tikhonov parameter
+            Default : 0
+
+        References
+        ----------
+        
+        [1] On dynamic mode decomposition:  Theory and applications,
+        Journal of Computational Dynamics,1,2,391,421,2014-12-1,
+        Jonathan H. Tu,Clarence W. Rowley,Dirk M. Luchtenburg,
+        Steven L. Brunton,J. Nathan Kutz,2158-2491_2014_2_391,
+
+
+        """
         if center:
             self.mean_flow = X.mean(axis=1)
             X -= self.mean_flow.reshape((-1, 1))
@@ -31,6 +78,10 @@ class POD:
                 vh = np.array(vh)
             else:
                 u, s, vh = sp.svd(X, False)
+
+            if rank > X.shape[1]:
+                warnings.warn("The rank chosen for reconstruction should not be greater than\
+                the number of snapshots 'm', the rank is now chosen as m")
 
             if opt_trunc:
                 if X.shape[0] <= X.shape[1]:
@@ -81,7 +132,24 @@ class POD:
         return u, s, vh
 
     def reconstruct(self, rank=None):
+        """Reconstruct the data input using the POD Model.
 
+        Parameters
+        ----------
+        rank: int or None
+            ranks kept for prediction: it should be a hard threshold integer
+            and greater than the rank chose/computed in the decomposition
+            phase. If None, the same rank already computed is used
+            Default : None 
+
+        Returns
+        ----------
+            numpy.ndarray, size (N, m)
+            POD Reconstruction on the time steps where the input snapshots are taken
+        """
+        if self.singvals is None:
+            raise Exception("The POD decomposition hasn't been executed yet")
+        
         if rank is None:
             rank = self.kept_rank
         elif not (isinstance(rank, int) and 0 < rank < self.kept_rank):

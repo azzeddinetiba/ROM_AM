@@ -1,21 +1,26 @@
-from email.mime import image
 import numpy as np
 from .pod import *
 
 
 class DMD:
+    """
+    Dynamic Mode Decomposition Class
+
+    """
+
     def __init__(self):
 
         self.singvals = None
         self.modes = None
         self.time = None
-
+        self.dmd_modes = None
         self.dt = None
         self.t1 = None
         self.n_timesteps = None
         self.tikhonov = None
         self.x_cond = None
         self._kept_rank = None
+        self.init = None
 
     def decompose(self,
                   X,
@@ -27,21 +32,91 @@ class DMD:
                   sorting="abs",
                   Y=None,
                   dt=None,):
+        """Training the dynamic mode decomposition model, using the input data X and Y
+
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Snapshot matrix data, of (N, m) size
+        Y : numpy.ndarray
+            Second Snapshot matrix data, of (N, m) size
+            advanced from X by dt
+        dt : float
+            value of time step from each snapshot in X
+            to each snapshot in Y
+        center : bool, optional
+            Flag to either center the data around time or not
+            Default : False
+        alg : str, optional
+            Whether to use the SVD on decomposition ("svd") or
+            the eigenvalue problem on snaphot matrices ("snap")
+            Default : "svd"
+        rank : int or float, optional
+            if rank = 0 All the ranks are kept, unless their
+            singular values are zero
+            if 0 < rank < 1, it is used as the percentage of
+            the energy that should be kept, and the rank is
+            computed accordingly
+            Default : 0
+        opt_trunc : bool, optional
+            if True an optimal truncation/threshold is estimated,
+            based on the algorithm of Gavish and Donoho [2]
+            Default : False
+        tikhonov : int or float, optional
+            tikhonov parameter for regularization
+            If 0, no regularization is applied, if float, it is used as
+            the lambda tikhonov parameter
+            Default : 0
+        sorting : str, optional
+            Whether to sort the discrete DMD eigenvalues by absolute
+            value ("abs") or by their real part ("real")
+            Default : "abs"
+
+        References
+        ----------
+        
+        [1] On dynamic mode decomposition:  Theory and applications,
+        Journal of Computational Dynamics,1,2,391,421,2014-12-1,
+        Jonathan H. Tu,Clarence W. Rowley,Dirk M. Luchtenburg,
+        Steven L. Brunton,J. Nathan Kutz,2158-2491_2014_2_391,
+
+        [2] M. Gavish and D. L. Donoho, "The Optimal Hard Threshold for
+        Singular Values is 4/sqrt(3) ," in IEEE Transactions on Information
+        Theory, vol. 60, no. 8, pp. 5040-5053, Aug. 2014,
+        doi: 10.1109/TIT.2014.2323359.
+
+        Returns
+        ------
+        u : numpy.ndarray, of size(N, r)
+            The spatial modes of the training data
+
+        s : numpy.ndarray, of size(r, )
+            The singular values modes of the training data
+
+        vh : numpy.ndarray, of size(r, m)
+            The time dynamics of the training data
+
+
+        """
 
         self.tikhonov = tikhonov
         if self.tikhonov:
             self.x_cond = np.linalg.cond(X)
 
         self.n_timesteps = X.shape[1]
+        self.init = X[:, 0]
+
+        # POD Decomposition of the X matrix
         self.pod_ = POD()
         self.pod_.decompose(X, alg=alg, rank=rank,
                             opt_trunc=opt_trunc, center=center)
-
         u = self.pod_.modes
         vh = self.pod_.time
         s = self.pod_.singvals
         self._kept_rank = self.pod_.kept_rank
 
+        # Computing the A_tilde: the projection of the 'A' operator
+        # on the POD modes, where A = Y * pseudoinverse(X) [1]
         s_inv = np.zeros(s.shape)
         s_inv = 1 / s
         s_inv_ = s_inv.copy()
@@ -50,6 +125,7 @@ class DMD:
         store = np.linalg.multi_dot((Y, vh.T, np.diag(s_inv_)))
         self.A_tilde = u.T @ store
 
+        # Eigendecomposition on the low dimensional operator
         lambd, w = np.linalg.eig(self.A_tilde)
         if sorting == "abs":
             idx = (np.abs(lambd)).argsort()[::-1]
@@ -59,22 +135,48 @@ class DMD:
         w = w[:, idx]
         self.low_dim_eig = w
 
+        # Computing the high-dimensional DMD modes [1]
         phi = store @ w
+        omega = np.log(lambd) / dt  # Continuous system eigenvalues
 
+        # Loading the DMD instance's attributes
+        self.dt = dt
+        self.dmd_modes = phi
+        self.lambd = lambd
+        self.eigenvalues = omega
         self.singvals = s
         self.modes = u
         self.time = vh
 
-        self.dt = dt
-        omega = np.log(lambd) / dt
-
-        self.dmd_modes = phi
-        self.lambd = lambd
-        self.eigenvalues = omega
-
         return u, s, vh
 
-    def predict(self, t, init=0, t1=0, method=0, rank=None, stabilize=False):
+    def predict(self, t, t1=0, method=0, rank=None, stabilize=False):
+        """Predict the DMD solution on the prescribed time instants.
+
+        Parameters
+        ----------
+        t : numpy.ndarray, size (nt, )
+            time steps at which the DMD solution will be computed
+        t1: float
+            the value of the time instant of the first snapshot
+        rank: int or None
+            ranks kept for prediction: it should be a hard threshold integer
+            and greater than the rank chose/computed in the decomposition
+            phase. If None, the same rank already computed is used
+            Default : None
+        method: int
+            Method used to compute the initial mode amplitudes
+            0 if it is computed on the POD subspace as in Tu et al.[1]
+            1 if it is computed using the pseudoinverse of the DMD modes
+            Default : 0
+
+        Returns
+        ----------
+            numpy.ndarray, size (N, nt)
+            ROM solution on the time values t
+        """
+        if self.dmd_modes is None:
+            raise Exception("The DMD decomposition hasn't been executed yet")
 
         if rank is None:
             rank = self._kept_rank
@@ -85,6 +187,7 @@ class DMD:
 
         self.t1 = t1
         if method:
+            init = self.init
             b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
             b /= np.exp(self.eigenvalues * t1)
         else:
@@ -100,7 +203,21 @@ class DMD:
         return self.dmd_modes[:, :rank] @ (np.exp(np.outer(eig, t).T) * b[:rank]).T
 
     def reconstruct(self, rank=None):
+        """Reconstruct the data input using the DMD Model.
 
+        Parameters
+        ----------
+        rank: int or None
+            ranks kept for prediction: it should be a hard threshold integer
+            and greater than the rank chose/computed in the decomposition
+            phase. If None, the same rank already computed is used
+            Default : None 
+
+        Returns
+        ----------
+            numpy.ndarray, size (N, m)
+            DMD solution on the time steps where the input snapshots are taken
+        """
         if rank is None:
             rank = self._kept_rank
         elif not (isinstance(rank, int) and 0 < rank < self.kept_rank):
@@ -112,6 +229,7 @@ class DMD:
             self.t1 = 0
             warnings.warn('the initial instant value was not assigned during the prediction phase,\
                 t1 is chosen as 0')
+
         t = np.linspace(self.t1, self.t1 + (self.n_timesteps - 1)
                         * self.dt, self.n_timesteps)
         y0 = np.linalg.multi_dot((self.modes[:, :rank], np.diag(
