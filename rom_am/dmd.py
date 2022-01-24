@@ -1,5 +1,6 @@
 import numpy as np
 from .pod import POD
+import warnings
 
 
 class DMD:
@@ -74,7 +75,7 @@ class DMD:
 
         References
         ----------
-        
+
         [1] On dynamic mode decomposition:  Theory and applications,
         Journal of Computational Dynamics,1,2,391,421,2014-12-1,
         Jonathan H. Tu,Clarence W. Rowley,Dirk M. Luchtenburg,
