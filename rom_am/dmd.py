@@ -199,7 +199,9 @@ class DMD:
 
         eig = self.eigenvalues[:rank]
         if stabilize:
-            eig[np.abs(self.lambd[:rank]) > 1].real = 0
+            eig_rmpl = eig[np.abs(self.lambd[:rank]) > 1]
+            eig_rmpl.real = 0
+            eig[np.abs(self.lambd[:rank]) > 1] = eig_rmpl
 
         return self.dmd_modes[:, :rank] @ (np.exp(np.outer(eig, t).T) * b[:rank]).T
 
