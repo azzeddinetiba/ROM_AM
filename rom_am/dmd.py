@@ -22,6 +22,7 @@ class DMD:
         self.x_cond = None
         self._kept_rank = None
         self.init = None
+        self.A_tilde = None
 
     def decompose(self,
                   X,
