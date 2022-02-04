@@ -119,6 +119,7 @@ DATA/*.mat
 DATA/*/*.mat
 !DATA/.gitkeep 
 /Figures/*
+/examples/fsi_test_case figures.ipynb
 
 .idea/
 *.DS_Store
