@@ -30,15 +30,16 @@ class ROM:
         self.time = None
         self.normalize = False
         self.profile = {}
+        self.center = False
 
     def decompose(
             self,
             X,
-            center=False,
             alg="svd",
             rank=0,
             opt_trunc=False,
             tikhonov=0,
+            center=False,
             normalize=False,
             *args,
             **kwargs,):
@@ -48,10 +49,7 @@ class ROM:
         Parameters
         ----------
         X : numpy.ndarray
-            Snapshot matrix data, of (N, m) size 
-        center : bool, optional
-            Flag to either center the data around time or not
-            Default : False
+            Snapshot matrix data, of (N, m) size
         alg : str, optional
             Whether to use the SVD on decomposition ("svd") or
             the eigenvalue problem on snaphot matrices ("snap")
@@ -86,13 +84,16 @@ class ROM:
         """
 
         self.snapshots = X.copy()
+        if center:
+            self.center = center
+            self._center()
+
         if normalize:
             self.normalize = normalize
             self._normalize()
 
         t0 = time.time()
         u, s, vh = self.model.decompose(X=self.snapshots,
-                                        center=center,
                                         alg=alg,
                                         rank=rank,
                                         opt_trunc=opt_trunc,
@@ -129,6 +130,8 @@ class ROM:
         """
         t0 = time.time()
         res = self.model.predict(t=t, t1=t1, rank=rank, *args, **kwargs)
+        if self.center:
+            res = self._decenter(res)        
         if self.normalize:
             res = self._denormalize(res)
         t1 = time.time()
@@ -178,3 +181,25 @@ class ROM:
         """
         return res * ((self.snap_max-self.snap_min)[:, np.newaxis]) \
             + self.snap_min[:, np.newaxis]
+
+    def _center(self, ):
+        """Center the data along time
+
+        """
+        self.mean_flow = self.snapshots.mean(axis=1)
+        self.snapshots -= self.mean_flow.reshape((-1, 1))
+
+    def _decenter(self, res):
+        """Min-Max denormalization of the input array
+
+        Parameters
+        ----------
+        res: numpy.ndarray, size (N, m)
+            has the same axis 0 dimension as the input snapshots 
+
+        Returns
+        ----------
+            numpy.ndarray, size (N, m)
+            the denormalized array based on the min and max of the input snapshots
+        """
+        return res + self.mean_flow.reshape((-1, 1))
