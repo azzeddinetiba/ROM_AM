@@ -1,3 +1,5 @@
+import time
+
 
 class ROM:
     """
@@ -26,6 +28,7 @@ class ROM:
         self.singvals = None
         self.modes = None
         self.time = None
+        self.profile = {}
 
     def decompose(
             self,
@@ -82,6 +85,7 @@ class ROM:
 
         self.snapshots = X.copy()
 
+        t0 = time.time()
         u, s, vh = self.model.decompose(X=self.snapshots,
                                         center=center,
                                         alg=alg,
@@ -94,6 +98,9 @@ class ROM:
         self.singvals = s
         self.modes = u
         self.time = vh
+        t1 = time.time()
+
+        self.profile["Training time"] = t1-t0
 
     def predict(self, t, t1=0, rank=None, *args, **kwargs):
         """Predict the solution of the reduced order model on the prescribed time instants.
@@ -115,7 +122,11 @@ class ROM:
             numpy.ndarray, size (N, nt)
             ROM solution on the time values t
         """
-        return self.model.predict(t=t, t1=t1, rank=rank, *args, **kwargs)
+        t0 = time.time()
+        res = self.model.predict(t=t, t1=t1, rank=rank, *args, **kwargs)
+        t1 = time.time()
+        self.profile["Prediction time"] = t1-t0
+        return res
 
     def reconstruct(self, rank=None):
         """Reconstruct the data input using the Reduced Order Model.
