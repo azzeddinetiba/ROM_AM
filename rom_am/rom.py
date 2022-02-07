@@ -1,4 +1,5 @@
 import time
+import numpy as np
 
 
 class ROM:
@@ -24,10 +25,10 @@ class ROM:
 
         self.model = rom_object
         self.snapshots = None
-
         self.singvals = None
         self.modes = None
         self.time = None
+        self.normalize = False
         self.profile = {}
 
     def decompose(
@@ -38,6 +39,7 @@ class ROM:
             rank=0,
             opt_trunc=False,
             tikhonov=0,
+            normalize=False,
             *args,
             **kwargs,):
         """Computes the data decomposition, training the model on the input data X.
@@ -84,6 +86,9 @@ class ROM:
         """
 
         self.snapshots = X.copy()
+        if normalize:
+            self.normalize = normalize
+            self._normalize()
 
         t0 = time.time()
         u, s, vh = self.model.decompose(X=self.snapshots,
@@ -124,6 +129,8 @@ class ROM:
         """
         t0 = time.time()
         res = self.model.predict(t=t, t1=t1, rank=rank, *args, **kwargs)
+        if self.normalize:
+            res = self._denormalize(res)
         t1 = time.time()
         self.profile["Prediction time"] = t1-t0
         return res
@@ -145,3 +152,29 @@ class ROM:
             ROM solution on the time steps where the input snapshots are taken
         """
         return self.model.reconstruct(rank=rank)
+
+    def _normalize(self, ):
+        """Min-Max normalization of the input snapshots
+
+        """
+        self.snap_max = np.max(self.snapshots, axis=1)
+        self.snap_min = np.min(self.snapshots, axis=1)
+        self.snapshots = (self.snapshots - np.min(self.snapshots, axis=1)[:, np.newaxis]) /\
+            ((np.max(self.snapshots, axis=1) -
+             np.min(self.snapshots, axis=1))[:, np.newaxis])
+
+    def _denormalize(self, res):
+        """Min-Max denormalization of the input array
+
+        Parameters
+        ----------
+        res: numpy.ndarray, size (N, m)
+            has the same axis 0 dimension as the input snapshots 
+
+        Returns
+        ----------
+            numpy.ndarray, size (N, m)
+            the denormalized array based on the min and max of the input snapshots
+        """
+        return res * ((self.snap_max-self.snap_min)[:, np.newaxis]) \
+            + self.snap_min[:, np.newaxis]
