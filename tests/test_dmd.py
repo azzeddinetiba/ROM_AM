@@ -13,9 +13,9 @@ if "linux" in sys.platform:
     jax.config.update("jax_enable_x64", True)
 
 
-def func(nx, nt, t_stop=2):
+def func(nx, nt,):
     x = np.linspace(0, 1, nx)
-    t = np.linspace(0, 2, ny)
+    t = np.linspace(0, 2, nt)
     tt, xx = np.meshgrid(t, x, )
     z = np.exp(-np.abs((xx-.5)*(tt-1))) + np.sin(xx**tt)
 
@@ -23,11 +23,11 @@ def func(nx, nt, t_stop=2):
 
 
 nx = 2000
-ny = 100
+nt = 100
 x = np.linspace(0, 1, nx)
-t = np.linspace(0, 2, ny)
+t = np.linspace(0, 2, nt)
 tt, xx = np.meshgrid(t, x, )
-z = func(nx, ny)
+z = func(nx, nt)
 
 dt = t[-1]-t[-2]
 dmd = DMD()
