@@ -25,16 +25,13 @@ class POD:
         self.modes = None
         self.time = None
 
-    def decompose(self, X, center=False, alg="svd", rank=0, opt_trunc=False, tikhonov=0):
+    def decompose(self, X, alg="svd", rank=0, opt_trunc=False, tikhonov=0):
         """Computes the proper orthogonal decomposition, training the model on the input data X.
 
         Parameters
         ----------
         X : numpy.ndarray
-            Snapshot matrix data, of (N, m) size 
-        center : bool, optional
-            Flag to either center the data around time or not
-            Default : False
+            Snapshot matrix data, of (N, m) size
         alg : str, optional
             Whether to use the SVD on decomposition ("svd") or
             the eigenvalue problem on snaphot matrices ("snap")
@@ -58,7 +55,7 @@ class POD:
 
         References
         ----------
-        
+
         [1] On dynamic mode decomposition:  Theory and applications,
         Journal of Computational Dynamics,1,2,391,421,2014-12-1,
         Jonathan H. Tu,Clarence W. Rowley,Dirk M. Luchtenburg,
@@ -66,9 +63,6 @@ class POD:
 
 
         """
-        if center:
-            self.mean_flow = X.mean(axis=1)
-            X -= self.mean_flow.reshape((-1, 1))
 
         if alg == "svd":
             if os_ == 0:
@@ -149,7 +143,7 @@ class POD:
         """
         if self.singvals is None:
             raise Exception("The POD decomposition hasn't been executed yet")
-        
+
         if rank is None:
             rank = self.kept_rank
         elif not (isinstance(rank, int) and 0 < rank < self.kept_rank):
