@@ -1,4 +1,5 @@
 import time
+from matplotlib.pyplot import axis
 import numpy as np
 
 
@@ -41,6 +42,7 @@ class ROM:
             tikhonov=0,
             center=False,
             normalize=False,
+            normalization="norm",
             *args,
             **kwargs,):
         """Computes the data decomposition, training the model on the input data X.
@@ -84,13 +86,18 @@ class ROM:
         """
 
         self.snapshots = X.copy()
+        if "Y" in kwargs.keys():
+            self.Y = kwargs["Y"].copy()
         if center:
             self.center = center
             self._center()
 
         if normalize:
             self.normalize = normalize
+            self.normalization = normalization
             self._normalize()
+        if "Y" in kwargs.keys():
+            kwargs["Y"] = self.Y
 
         t0 = time.time()
         u, s, vh = self.model.decompose(X=self.snapshots,
@@ -131,7 +138,7 @@ class ROM:
         t0 = time.time()
         res = self.model.predict(t=t, t1=t1, rank=rank, *args, **kwargs)
         if self.center:
-            res = self._decenter(res)        
+            res = self._decenter(res)
         if self.normalize:
             res = self._denormalize(res)
         t1 = time.time()
@@ -156,15 +163,30 @@ class ROM:
         """
         return self.model.reconstruct(rank=rank)
 
-    def _normalize(self, ):
+    def _normalize(self, Y=None):
         """Min-Max normalization of the input snapshots
 
         """
-        self.snap_max = np.max(self.snapshots, axis=1)
-        self.snap_min = np.min(self.snapshots, axis=1)
-        self.snapshots = (self.snapshots - np.min(self.snapshots, axis=1)[:, np.newaxis]) /\
-            ((np.max(self.snapshots, axis=1) -
-             np.min(self.snapshots, axis=1))[:, np.newaxis])
+        if self.normalization == "minmax":
+            if self.Y is None:
+                self.snap_max = np.max(self.snapshots, axis=1)
+                self.snap_min = np.min(self.snapshots, axis=1)
+                self.snapshots = (self.snapshots - self.snap_min[:, np.newaxis]) /\
+                    ((self.snap_max -
+                      self.snap_min)[:, np.newaxis])
+            else:
+                self.snap_max = np.max(
+                    np.hstack((self.snapshots, self.Y[:, -1].reshape((-1, 1)))), axis=1)
+                self.snap_min = np.min(
+                    np.hstack((self.snapshots, self.Y[:, -1].reshape((-1, 1)))), axis=1)
+                self.Y = (self.Y - self.snap_min[:, np.newaxis]) /\
+                    ((self.snap_max -
+                      self.snap_min)[:, np.newaxis])
+            self.snapshots = (self.snapshots - self.snap_min[:, np.newaxis]) /\
+                ((self.snap_max -
+                  self.snap_min)[:, np.newaxis])
+        elif self.normalization == "norm":
+            pass
 
     def _denormalize(self, res):
         """Min-Max denormalization of the input array
@@ -182,15 +204,20 @@ class ROM:
         return res * ((self.snap_max-self.snap_min)[:, np.newaxis]) \
             + self.snap_min[:, np.newaxis]
 
-    def _center(self, ):
+    def _center(self,):
         """Center the data along time
 
         """
-        self.mean_flow = self.snapshots.mean(axis=1)
+        if self.Y is None:
+            self.mean_flow = self.snapshots.mean(axis=1)
+        else:
+            self.mean_flow = np.hstack(
+                (self.snapshots, self.Y[:, -1].reshape((-1, 1)))).mean(axis=1)
+            self.Y -= self.mean_flow.reshape((-1, 1))
         self.snapshots -= self.mean_flow.reshape((-1, 1))
 
     def _decenter(self, res):
-        """Min-Max denormalization of the input array
+        """Decenter the data on the input array
 
         Parameters
         ----------
@@ -200,6 +227,6 @@ class ROM:
         Returns
         ----------
             numpy.ndarray, size (N, m)
-            the denormalized array based on the min and max of the input snapshots
+            the decentered data based on the mean of the input snapshots
         """
         return res + self.mean_flow.reshape((-1, 1))
