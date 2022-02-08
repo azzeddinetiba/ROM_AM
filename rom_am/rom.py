@@ -72,6 +72,16 @@ class ROM:
             If 0, no regularization is applied, if float, it is used as
             the lambda tikhonov parameter
             Default : 0
+        center : bool, optional
+            Flag to either center the data around 0 or not
+            Default : False
+        normalize : bool, optional
+            Flag to either normalize the data or not
+            Default : False
+        normalization : str, optional
+            The type of normalization used : "norm" for normalization by
+            the L2 norm or "minmax" for the min-max normalization
+            Default : "norm"
 
         References
         ----------
@@ -164,7 +174,7 @@ class ROM:
         return self.model.reconstruct(rank=rank)
 
     def _normalize(self, Y=None):
-        """Min-Max normalization of the input snapshots
+        """normalization of the input snapshots
 
         """
         if self.normalization == "minmax":
@@ -186,10 +196,21 @@ class ROM:
                 ((self.snap_max -
                   self.snap_min)[:, np.newaxis])
         elif self.normalization == "norm":
-            pass
+            if self.Y is None:
+                self.snap_norms = np.linalg.norm(self.snapshots, axis=1)
+                self.snap_norms = np.where(np.isclose(
+                    self.snap_norms, 0), 1, self.snap_norms)
+            else:
+                self.snap_norms = np.linalg.norm(
+                    np.hstack((self.snapshots, self.Y[:, -1].reshape((-1, 1)))), axis=1)
+                self.snap_norms = np.where(np.isclose(
+                    self.snap_norms, 0), 1, self.snap_norms)
+                self.Y = self.Y / self.snap_norms[:, np.newaxis]
+
+            self.snapshots = self.snapshots / self.snap_norms[:, np.newaxis]
 
     def _denormalize(self, res):
-        """Min-Max denormalization of the input array
+        """denormalization of the input array
 
         Parameters
         ----------
@@ -201,8 +222,11 @@ class ROM:
             numpy.ndarray, size (N, m)
             the denormalized array based on the min and max of the input snapshots
         """
-        return res * ((self.snap_max-self.snap_min)[:, np.newaxis]) \
-            + self.snap_min[:, np.newaxis]
+        if self.normalization == "minmax":
+            return res * ((self.snap_max-self.snap_min)[:, np.newaxis]) \
+                + self.snap_min[:, np.newaxis]
+        elif self.normalization == "norm":
+            return res * self.snap_norms[:, np.newaxis]
 
     def _center(self,):
         """Center the data along time
