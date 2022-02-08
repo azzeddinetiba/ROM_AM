@@ -7,6 +7,7 @@ class DMDc:
     Dynamic Mode Decomposition with Control Class
 
     """
+
     def __init__(self):
 
         self.singvals = None
@@ -23,7 +24,6 @@ class DMDc:
 
     def decompose(self,
                   X,
-                  center=False,
                   alg="svd",
                   rank=0,
                   opt_trunc=False,
@@ -45,9 +45,6 @@ class DMDc:
         dt : float
             value of time step from each snapshot in X
             to each snapshot in Y
-        center : bool, optional
-            Flag to either center the data around time or not
-            Default : False
         alg : str, optional
             Whether to use the SVD on decomposition ("svd") or
             the eigenvalue problem on snaphot matrices ("snap")
@@ -111,11 +108,11 @@ class DMDc:
         self.pod_til = POD()
         self.pod_hat = POD()
         u_til, s_til, vh_til = self.pod_til.decompose(
-            Omega, center = center, alg=alg, rank=rank, opt_trunc=opt_trunc)
+            Omega, alg=alg, rank=rank, opt_trunc=opt_trunc)
         u_til_1 = u_til[: X.shape[0], :]
         u_til_2 = u_til[: Y_input.shape[0], :]
         u_hat, _, _ = self.pod_hat.decompose(
-            Y, center = center, alg=alg, rank=rank, opt_trunc=opt_trunc)
+            Y, alg=alg, rank=rank, opt_trunc=opt_trunc)
 
         s_til_inv = np.zeros(s_til.shape)
         s_til_inv = 1 / s_til

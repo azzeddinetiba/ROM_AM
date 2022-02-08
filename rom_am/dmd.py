@@ -26,7 +26,6 @@ class DMD:
 
     def decompose(self,
                   X,
-                  center=False,
                   alg="svd",
                   rank=0,
                   opt_trunc=False,
@@ -46,9 +45,6 @@ class DMD:
         dt : float
             value of time step from each snapshot in X
             to each snapshot in Y
-        center : bool, optional
-            Flag to either center the data around time or not
-            Default : False
         alg : str, optional
             Whether to use the SVD on decomposition ("svd") or
             the eigenvalue problem on snaphot matrices ("snap")
@@ -111,7 +107,7 @@ class DMD:
         # POD Decomposition of the X matrix
         self.pod_ = POD()
         self.pod_.decompose(X, alg=alg, rank=rank,
-                            opt_trunc=opt_trunc, center=center)
+                            opt_trunc=opt_trunc)
         u = self.pod_.modes
         vh = self.pod_.time
         s = self.pod_.singvals
