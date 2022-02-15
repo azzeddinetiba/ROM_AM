@@ -168,7 +168,7 @@ class DMDc:
             Default : None
         x_input: numpy.ndarray, size (N, nt)
             state matrix at time steps t
-        x_input: numpy.ndarray, size (q, nt)
+        u_input: numpy.ndarray, size (q, nt)
             control input matrix at time steps t
 
         Returns
