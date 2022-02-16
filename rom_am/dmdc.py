@@ -1,4 +1,5 @@
 import numpy as np
+from numpy import newaxis
 from .pod import POD
 
 
@@ -115,7 +116,7 @@ class DMDc:
         u_til, s_til, vh_til = self.pod_til.decompose(
             Omega, alg=alg, rank=rank, opt_trunc=opt_trunc)
         u_til_1 = u_til[: X.shape[0], :]
-        u_til_2 = u_til[: Y_input.shape[0], :]
+        u_til_2 = u_til[X.shape[0]::, :]
         u_hat, _, _ = self.pod_hat.decompose(
             Y, alg=alg, rank=rank, opt_trunc=opt_trunc)
         self._kept_rank = self.pod_hat.kept_rank
@@ -213,4 +214,4 @@ class DMDc:
                 rank = self._kept_rank
 
             return self.dmd_modes[:, :rank] @ (np.exp(np.outer(eig, t).T) * b[:rank]).T \
-                - self.control_component @ u_input
+                - (self.control_component @ u_input[:, 0])[:, np.newaxis]
