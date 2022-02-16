@@ -21,6 +21,7 @@ class DMDc:
         self.x_cond = None
         self._kept_rank = None
         self.init = None
+        self.input_init = None
 
     def decompose(self,
                   X,
@@ -103,6 +104,10 @@ class DMDc:
         if self.tikhonov:
             self.x_cond = np.linalg.cond(X)
 
+        self.n_timesteps = X.shape[1]
+        self.init = X[:, 0]
+        self.input_init = Y_input[:, 0]
+
         # POD Decomposition of the X and Y matrix
         Omega = np.vstack((X, Y_input))
         self.pod_til = POD()
@@ -113,6 +118,7 @@ class DMDc:
         u_til_2 = u_til[: Y_input.shape[0], :]
         u_hat, _, _ = self.pod_hat.decompose(
             Y, alg=alg, rank=rank, opt_trunc=opt_trunc)
+        self._kept_rank = self.pod_hat.kept_rank
 
         s_til_inv = np.zeros(s_til.shape)
         s_til_inv = 1 / s_til
@@ -152,7 +158,7 @@ class DMDc:
 
         return u, s, vh
 
-    def predict(self, t, t1=0, rank=None, x_input=None, u_input=None):
+    def predict(self, t, t1=0, rank=None, x_input=None, u_input=None, fixed_input=False, stabilize=False):
         """Predict the DMD solution on the prescribed time instants.
 
         Parameters
@@ -176,6 +182,35 @@ class DMDc:
             numpy.ndarray, size (N, nt)
             DMDc solution on the time values t+dt
         """
+        if not fixed_input:
+            if x_input is not None:
+                return self.u_hat @ (self.A_tilde @ self.u_hat.T @ x_input
+                                     + self.B_tilde @ u_input)
+            else:
+                data = np.zeros(
+                    (self.init.shape[0], u_input.shape[1]+1), dtype=complex)
+                data[:, 0] = self.init.copy()
+                for i in range(u_input.shape[1]):
+                    data[:, i+1] = np.linalg.multi_dot((self.dmd_modes, np.diag(self.lambd), np.linalg.pinv(
+                        self.dmd_modes), data[:, i])) + np.linalg.multi_dot((self.u_hat, self.B_tilde, u_input[:, i]))
+                return data
+        else:
 
-        return self.u_hat @ (self.A_tilde @ self.u_hat.T @ x_input
-                             + self.B_tilde @ u_input)
+            self.control_component = np.linalg.multi_dot((self.dmd_modes, np.diag(
+                1/self.eigenvalues), np.linalg.pinv(self.dmd_modes), self.u_hat, self.B_tilde))
+
+            init = self.init
+            eig = self.eigenvalues[:rank]
+            if stabilize:
+                eig_rmpl = eig[np.abs(self.lambd[:rank]) > 1]
+                eig_rmpl.real = 0
+                eig[np.abs(self.lambd[:rank]) > 1] = eig_rmpl
+
+            b, _, _, _ = np.linalg.lstsq(
+                self.dmd_modes, init + self.control_component @ self.input_init, rcond=None)
+            b /= np.exp(self.eigenvalues * t1)
+            if rank is None:
+                rank = self._kept_rank
+
+            return self.dmd_modes[:, :rank] @ (np.exp(np.outer(eig, t).T) * b[:rank]).T \
+                - self.control_component @ u_input
