@@ -183,6 +183,9 @@ class DMDc:
             numpy.ndarray, size (N, nt)
             DMDc solution on the time values t+dt
         """
+        if rank is None:
+            rank = self._kept_rank
+
         init = self.init
         if not fixed_input:
             if x_input is not None:
@@ -190,13 +193,12 @@ class DMDc:
                                      + self.B_tilde @ u_input)
             else:
                 data = np.zeros(
-                    (self._kept_rank, u_input.shape[1]+1), dtype=complex)
-                data[:, 0] = self.u_hat.T @ init
+                    (rank, u_input.shape[1]+1), dtype=complex)
+                data[:, 0] = self.u_hat[:, :rank].T @ init
                 for i in range(u_input.shape[1]):
-                    # data[:, i+1] = np.linalg.multi_dot((self.dmd_modes, np.diag(self.lambd), np.linalg.pinv(
-                    #     self.dmd_modes), data[:, i])) + np.linalg.multi_dot((self.u_hat, self.B_tilde, u_input[:, i]))
-                    data[:, i+1] = self.A_tilde @ data[:, i] + self.B_tilde @ u_input[:, i]
-                data = self.u_hat @ data
+                    data[:, i+1] = self.A_tilde[:rank, :rank] @ data[:,
+                                                                     i][:rank] + self.B_tilde[:rank, :] @ u_input[:, i]
+                data = self.u_hat[:, :rank] @ data
                 return data
         else:
 
@@ -212,8 +214,6 @@ class DMDc:
             b, _, _, _ = np.linalg.lstsq(
                 self.dmd_modes, init + self.control_component @ self.input_init, rcond=None)
             b /= np.exp(self.eigenvalues * t1)
-            if rank is None:
-                rank = self._kept_rank
 
             return self.dmd_modes[:, :rank] @ (np.exp(np.outer(eig, t).T) * b[:rank]).T \
                 - (self.control_component @ u_input[:, 0])[:, np.newaxis]
