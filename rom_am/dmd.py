@@ -167,6 +167,10 @@ class DMD:
             0 if it is computed on the POD subspace as in Tu et al.[1]
             1 if it is computed using the pseudoinverse of the DMD modes
             Default : 0
+        stabilize : bool, optional
+            DMD eigenvalue-shifting to stable eigenvalues at the prediction
+            phase
+            Default : False
 
         Returns
         ----------

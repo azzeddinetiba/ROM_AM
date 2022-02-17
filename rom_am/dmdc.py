@@ -174,9 +174,18 @@ class DMDc:
             phase. If None, the same rank already computed is used
             Default : None
         x_input: numpy.ndarray, size (N, nt)
-            state matrix at time steps t
+            state matrix at time steps t. Used for reconstruction
+            Adding this flag will disregard the u_input flag
         u_input: numpy.ndarray, size (q, nt)
-            control input matrix at time steps t
+            control input matrix at time steps t.
+        fixed_input: bool, optional
+            Specifies if the input conntrol is fixed through time, this
+            allows for continuous prediction approach, faster in computation
+            when number of ranks excedds ~10
+        stabilize : bool, optional
+            DMD eigenvalue-shifting to stable eigenvalues at the prediction
+            phase
+            Default : False
 
         Returns
         ----------
