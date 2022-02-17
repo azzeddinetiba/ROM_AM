@@ -10,5 +10,5 @@ setup(
     packages=['rom_am'],
     # external packages as dependencies
     install_requires=['numpy >= 1.20.3', 'scipy >= 1.7.1',
-                      'jax >= 0.2.26 ; platform_system=="linux"'],
+                      'jax >= 0.2.26, jaxlib>=0.1.75 ; platform_system=="linux"'],
 )
