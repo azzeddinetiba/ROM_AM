@@ -211,8 +211,9 @@ class DMDc:
                 return data
         else:
 
-            self.control_component = np.linalg.multi_dot((self.dmd_modes, np.diag(
-                1/self.eigenvalues), np.linalg.pinv(self.dmd_modes), self.u_hat, self.B_tilde))
+            temp, _, _, _ = np.linalg.lstsq(
+                self.dmd_modes[:, :rank], self.u_hat[:, :rank] @ self.B_tilde[:rank, :], rcond=None)
+            self.control_component = temp
 
             eig = self.eigenvalues[:rank]
             if stabilize:
@@ -221,8 +222,8 @@ class DMDc:
                 eig[np.abs(self.lambd[:rank]) > 1] = eig_rmpl
 
             b, _, _, _ = np.linalg.lstsq(
-                self.dmd_modes, init + self.control_component @ self.input_init, rcond=None)
-            b /= np.exp(self.eigenvalues * t1)
+                self.dmd_modes[:, :rank], init + self.dmd_modes[:, :rank] @ (self.control_component @ self.input_init / eig), rcond=None)
+            b /= np.exp(self.eigenvalues[:rank] * t1)
 
-            return self.dmd_modes[:, :rank] @ (np.exp(np.outer(eig, t).T) * b[:rank]).T \
-                - (self.control_component @ u_input[:, 0])[:, np.newaxis]
+            return self.dmd_modes[:, :rank] @ ((np.exp(np.outer(eig, t).T) * b[:rank]).T
+                                               - (self.control_component @ u_input[:, 0] / eig)[:, np.newaxis])
