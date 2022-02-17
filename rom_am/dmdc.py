@@ -183,24 +183,26 @@ class DMDc:
             numpy.ndarray, size (N, nt)
             DMDc solution on the time values t+dt
         """
+        init = self.init
         if not fixed_input:
             if x_input is not None:
                 return self.u_hat @ (self.A_tilde @ self.u_hat.T @ x_input
                                      + self.B_tilde @ u_input)
             else:
                 data = np.zeros(
-                    (self.init.shape[0], u_input.shape[1]+1), dtype=complex)
-                data[:, 0] = self.init.copy()
+                    (self._kept_rank, u_input.shape[1]+1), dtype=complex)
+                data[:, 0] = self.u_hat.T @ init
                 for i in range(u_input.shape[1]):
-                    data[:, i+1] = np.linalg.multi_dot((self.dmd_modes, np.diag(self.lambd), np.linalg.pinv(
-                        self.dmd_modes), data[:, i])) + np.linalg.multi_dot((self.u_hat, self.B_tilde, u_input[:, i]))
+                    # data[:, i+1] = np.linalg.multi_dot((self.dmd_modes, np.diag(self.lambd), np.linalg.pinv(
+                    #     self.dmd_modes), data[:, i])) + np.linalg.multi_dot((self.u_hat, self.B_tilde, u_input[:, i]))
+                    data[:, i+1] = self.A_tilde @ data[:, i] + self.B_tilde @ u_input[:, i]
+                data = self.u_hat @ data
                 return data
         else:
 
             self.control_component = np.linalg.multi_dot((self.dmd_modes, np.diag(
                 1/self.eigenvalues), np.linalg.pinv(self.dmd_modes), self.u_hat, self.B_tilde))
 
-            init = self.init
             eig = self.eigenvalues[:rank]
             if stabilize:
                 eig_rmpl = eig[np.abs(self.lambd[:rank]) > 1]
