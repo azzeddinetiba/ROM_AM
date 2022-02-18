@@ -32,6 +32,7 @@ class ROM:
         self.normalize = False
         self.profile = {}
         self.center = False
+        self.norm_info = None
 
     def decompose(
             self,
@@ -43,6 +44,7 @@ class ROM:
             center=False,
             normalize=False,
             normalization="norm",
+            norm_info=None,
             *args,
             **kwargs,):
         """Computes the data decomposition, training the model on the input data X.
@@ -72,6 +74,24 @@ class ROM:
             If 0, no regularization is applied, if float, it is used as
             the lambda tikhonov parameter
             Default : 0
+        center : bool, optional
+            Flag to either center the data around 0 or not
+            Default : False
+        normalize : bool, optional
+            Flag to either normalize the data or not
+            Default : False
+        normalization : str, optional
+            The type of normalization used : "norm" for normalization by
+            the L2 norm or "minmax" for the min-max normalization or "spec"
+            for specific field normalization (division of each field by a
+            specific value), using "spec" flag should be accompanied by the
+            'norm_info' argument
+            Default : "norm"
+        norm_info : numpy.ndarray 2D
+            a 2D numpy array containing the value of norms each field will 
+            be divided on in the first column, the second column contains 
+            the sizeof the field accoring to each value, the sum of the
+            second column should be equal to the size of input data
 
         References
         ----------
@@ -94,7 +114,10 @@ class ROM:
 
         if normalize:
             self.normalize = normalize
+            self.norm_info = norm_info
             self.normalization = normalization
+            if self.norm_info is not None:
+                self.normalization = "spec"
             self._normalize()
         if "Y" in kwargs.keys():
             kwargs["Y"] = self.Y
@@ -164,7 +187,7 @@ class ROM:
         return self.model.reconstruct(rank=rank)
 
     def _normalize(self, Y=None):
-        """Min-Max normalization of the input snapshots
+        """normalization of the input snapshots
 
         """
         if self.normalization == "minmax":
@@ -186,10 +209,32 @@ class ROM:
                 ((self.snap_max -
                   self.snap_min)[:, np.newaxis])
         elif self.normalization == "norm":
-            pass
+            if self.Y is None:
+                self.snap_norms = np.linalg.norm(self.snapshots, axis=1)
+                self.snap_norms = np.where(np.isclose(
+                    self.snap_norms, 0), 1, self.snap_norms)
+            else:
+                self.snap_norms = np.linalg.norm(
+                    np.hstack((self.snapshots, self.Y[:, -1].reshape((-1, 1)))), axis=1)
+                self.snap_norms = np.where(np.isclose(
+                    self.snap_norms, 0), 1, self.snap_norms)
+                self.Y = self.Y / self.snap_norms[:, np.newaxis]
+            self.snapshots = self.snapshots / self.snap_norms[:, np.newaxis]
+        elif self.normalization == "spec":
+            assert self.norm_info is not None, "Values for specific normalization are not assigned through the \
+                'norm_info' argument"
+            assert np.sum(self.norm_info[:, 1]) == self.snapshots.shape[0], "The sum of fields lengths (size of \
+                second column of norm_info) should be the same as the size of input data"
+            if self.Y is not None:
+                self.Y = self.Y / \
+                    np.repeat(self.norm_info[:, 0], self.norm_info[:, 1].astype(int))[
+                        :, np.newaxis]
+            self.snapshots = self.snapshots / \
+                np.repeat(self.norm_info[:, 0], self.norm_info[:, 1].astype(int))[
+                    :, np.newaxis]
 
     def _denormalize(self, res):
-        """Min-Max denormalization of the input array
+        """denormalization of the input array
 
         Parameters
         ----------
@@ -201,8 +246,14 @@ class ROM:
             numpy.ndarray, size (N, m)
             the denormalized array based on the min and max of the input snapshots
         """
-        return res * ((self.snap_max-self.snap_min)[:, np.newaxis]) \
-            + self.snap_min[:, np.newaxis]
+        if self.normalization == "minmax":
+            return res * ((self.snap_max-self.snap_min)[:, np.newaxis]) \
+                + self.snap_min[:, np.newaxis]
+        elif self.normalization == "norm":
+            return res * self.snap_norms[:, np.newaxis]
+        elif self.normalization == "spec":
+            return res * np.repeat(self.norm_info[:, 0], self.norm_info[:, 1].astype(int))[
+                :, np.newaxis]
 
     def _center(self,):
         """Center the data along time
