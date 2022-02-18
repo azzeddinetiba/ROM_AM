@@ -6,11 +6,6 @@ from rom_am import DMD
 os_ = 1
 if "linux" in sys.platform:
     os_ = 0
-    import jax.numpy as jnp
-    import jax
-
-    jax.config.update("jax_platform_name", "cpu")
-    jax.config.update("jax_enable_x64", True)
 
 
 def func(nx, nt,):
