@@ -117,7 +117,7 @@ class DMDc:
             Omega, alg=alg, rank=rank, opt_trunc=opt_trunc)
         u_til_1 = u_til[: X.shape[0], :]
         u_til_2 = u_til[X.shape[0]::, :]
-        u_hat, _, _ = self.pod_hat.decompose(
+        u_hat, s_hat, vh_hat = self.pod_hat.decompose(
             Y, alg=alg, rank=rank, opt_trunc=opt_trunc)
         self._kept_rank = self.pod_hat.kept_rank
 
@@ -152,14 +152,14 @@ class DMDc:
         self.dmd_modes = phi
         self.lambd = lambd
         self.eigenvalues = omega
-        self.singvals = s
+        self.singvals = s_hat
         self.modes = u
-        self.time = vh
+        self.time = vh_hat
         self.u_hat = u_hat
 
         return u, s, vh
 
-    def predict(self, t, t1=0, rank=None, x_input=None, u_input=None, fixed_input=False, stabilize=False):
+    def predict(self, t, t1=0, rank=None, x_input=None, u_input=None, fixed_input=False, stabilize=False, method=0):
         """Predict the DMD solution on the prescribed time instants.
 
         Parameters
@@ -186,7 +186,12 @@ class DMDc:
             DMD eigenvalue-shifting to stable eigenvalues at the prediction
             phase
             Default : False
-
+        method: int
+            Method used to compute the initial mode amplitudes
+            0 if it is computed on the POD subspace as in Tu et al.[1]
+            1 if it is computed using the pseudoinverse of the DMD modes
+            Default : 0
+            
         Returns
         ----------
             numpy.ndarray, size (N, nt)
@@ -221,9 +226,15 @@ class DMDc:
                 eig_rmpl.real = 0
                 eig[np.abs(self.lambd[:rank]) > 1] = eig_rmpl
 
-            b, _, _, _ = np.linalg.lstsq(
-                self.dmd_modes[:, :rank], init + self.dmd_modes[:, :rank] @ (self.control_component @ self.input_init / eig), rcond=None)
-            b /= np.exp(self.eigenvalues[:rank] * t1)
+            if method:
+                init = self.init
+                b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
+                b /= np.exp(self.eigenvalues * t1)
+            else:
+                alpha1 = self.singvals[:rank] * self.time[:rank, 0]
+                b = np.linalg.solve(self.lambd[:rank] * self.low_dim_eig[:rank, :rank], alpha1) / np.exp(
+                    eig * t1
+                )
 
-            return self.dmd_modes[:, :rank] @ ((np.exp(np.outer(eig, t).T) * b[:rank]).T
+            return self.dmd_modes[:, :rank] @ ((np.exp(np.outer(eig, t).T) * b).T
                                                - (self.control_component @ u_input[:, 0] / eig)[:, np.newaxis])
