@@ -1,5 +1,7 @@
 # ROM_AM
- 
+
+ ![example workflow](https://github.com/azzeddinetiba/ROM_AM/actions/workflows/python-app.yml/badge.svg)
+
  install with 
  
  ```
