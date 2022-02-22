@@ -120,6 +120,9 @@ DATA/*/*.mat
 !DATA/.gitkeep 
 /Figures/*
 /examples/fsi_test_case figures.ipynb
+DATA/*/*.h3d
+DATA/*/*.csv
+DATA/*/*.oml
 
 .idea/
 *.DS_Store
