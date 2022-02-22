@@ -23,6 +23,7 @@ class DMD:
         self._kept_rank = None
         self.init = None
         self.A_tilde = None
+        self.__A = None
 
     def decompose(self,
                   X,
@@ -187,16 +188,7 @@ class DMD:
             rank chosen/computed at the decomposition phase. Please see the rank value in self.kept_rank')
             rank = self._kept_rank
 
-        self.t1 = t1
-        if method:
-            init = self.init
-            b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
-            b /= np.exp(self.eigenvalues * t1)
-        else:
-            alpha1 = self.singvals * self.time[:, 0]
-            b = np.linalg.solve(self.lambd * self.low_dim_eig, alpha1) / np.exp(
-                self.eigenvalues * t1
-            )
+        b = self._compute_amplitudes(t1, method)
 
         eig = self.eigenvalues[:rank]
         if stabilize:
@@ -236,6 +228,27 @@ class DMD:
 
         t = np.linspace(self.t1, self.t1 + (self.n_timesteps - 1)
                         * self.dt, self.n_timesteps)
-        y0 = np.linalg.multi_dot((self.modes[:, :rank], np.diag(
-            self.singvals[:rank]), self.time[:rank, 0])).reshape((-1, 1))
+        y0 = self.init.reshape((-1, 1))
         return np.hstack((y0, self.predict(t, t1=self.t1)))
+
+    def _compute_amplitudes(self, t1, method):
+        self.t1 = t1
+        if method:
+            init = self.init
+            b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
+            b /= np.exp(self.eigenvalues * t1)
+        else:
+            alpha1 = self.singvals * self.time[:, 0]
+            b = np.linalg.solve(self.lambd * self.low_dim_eig, alpha1) / np.exp(
+                self.eigenvalues * t1
+            )
+        return b
+
+    @property
+    def A(self):
+        """Compute the high dimensional DMD operator.
+
+        """
+        if self.__A is None:
+            self.__A = self.modes @ self.A_tilde @ self.modes.T
+        return self.__A
