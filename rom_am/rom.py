@@ -33,6 +33,8 @@ class ROM:
         self.profile = {}
         self.center = False
         self.norm_info = None
+        self.Y = None
+        self.Y_input = None
 
     def decompose(
             self,
@@ -108,6 +110,8 @@ class ROM:
         self.snapshots = X.copy()
         if "Y" in kwargs.keys():
             self.Y = kwargs["Y"].copy()
+            if "Y_input" in kwargs.keys():
+                self.Y_input = kwargs["Y_input"].copy()
         if center:
             self.center = center
             self._center()
@@ -121,6 +125,8 @@ class ROM:
             self._normalize()
         if "Y" in kwargs.keys():
             kwargs["Y"] = self.Y
+            if "Y_input" in kwargs.keys():
+                kwargs["Y_input"] = self.Y_input
 
         t0 = time.time()
         u, s, vh = self.model.decompose(X=self.snapshots,
@@ -194,32 +200,43 @@ class ROM:
             if self.Y is None:
                 self.snap_max = np.max(self.snapshots, axis=1)
                 self.snap_min = np.min(self.snapshots, axis=1)
-                self.snapshots = (self.snapshots - self.snap_min[:, np.newaxis]) /\
-                    ((self.snap_max -
-                      self.snap_min)[:, np.newaxis])
+                self.max_min = ((self.snap_max - self.snap_min)[:, np.newaxis])
+                self.max_min = np.where(np.isclose(
+                    self.max_min, 0), 1, self.max_min)
             else:
                 self.snap_max = np.max(
                     np.hstack((self.snapshots, self.Y[:, -1].reshape((-1, 1)))), axis=1)
                 self.snap_min = np.min(
                     np.hstack((self.snapshots, self.Y[:, -1].reshape((-1, 1)))), axis=1)
-                self.Y = (self.Y - self.snap_min[:, np.newaxis]) /\
-                    ((self.snap_max -
-                      self.snap_min)[:, np.newaxis])
-            self.snapshots = (self.snapshots - self.snap_min[:, np.newaxis]) /\
-                ((self.snap_max -
-                  self.snap_min)[:, np.newaxis])
+                self.max_min = ((self.snap_max - self.snap_min)[:, np.newaxis])
+                self.max_min = np.where(np.isclose(
+                    self.max_min, 0), 1, self.max_min)
+                self.Y = (self.Y - self.snap_min[:, np.newaxis]) / self.max_min
+            self.snapshots = (
+                self.snapshots - self.snap_min[:, np.newaxis]) / self.max_min
         elif self.normalization == "norm":
             if self.Y is None:
-                self.snap_norms = np.linalg.norm(self.snapshots, axis=1)
-                self.snap_norms = np.where(np.isclose(
-                    self.snap_norms, 0), 1, self.snap_norms)
+                temp = self.snapshots
+            elif self.Y_input is None:
+                temp = np.hstack(
+                    (self.snapshots, self.Y[:, -1].reshape((-1, 1))))
             else:
-                self.snap_norms = np.linalg.norm(
-                    np.hstack((self.snapshots, self.Y[:, -1].reshape((-1, 1)))), axis=1)
-                self.snap_norms = np.where(np.isclose(
-                    self.snap_norms, 0), 1, self.snap_norms)
-                self.Y = self.Y / self.snap_norms[:, np.newaxis]
-            self.snapshots = self.snapshots / self.snap_norms[:, np.newaxis]
+                temp = np.vstack(
+                    (np.hstack((self.snapshots, self.Y[:, -1].reshape((-1, 1)))), np.hstack((self.Y_input, self.Y_input[:, -1][:, np.newaxis]))))
+            self.snap_norms = np.linalg.norm(temp, axis=1)
+            self.snap_norms = np.where(np.isclose(
+                self.snap_norms, 0), 1, self.snap_norms)
+            if self.Y_input is not None:
+                self.Y_input = self.Y_input / \
+                    self.snap_norms[-1, np.newaxis]
+                self.Y = self.Y / self.snap_norms[:-1, np.newaxis]
+                self.snapshots = self.snapshots / \
+                    self.snap_norms[:-1, np.newaxis]
+            else:
+                self.snapshots = self.snapshots / \
+                    self.snap_norms[:, np.newaxis]
+                if self.Y is not None:
+                    self.Y = self.Y / self.snap_norms[:, np.newaxis]
         elif self.normalization == "spec":
             assert self.norm_info is not None, "Values for specific normalization are not assigned through the \
                 'norm_info' argument"
@@ -247,10 +264,12 @@ class ROM:
             the denormalized array based on the min and max of the input snapshots
         """
         if self.normalization == "minmax":
-            return res * ((self.snap_max-self.snap_min)[:, np.newaxis]) \
-                + self.snap_min[:, np.newaxis]
+            return res * self.max_min + self.snap_min[:, np.newaxis]
         elif self.normalization == "norm":
-            return res * self.snap_norms[:, np.newaxis]
+            if self.Y_input is not None:
+                return res * self.snap_norms[:-1, np.newaxis]
+            else:
+                return res * self.snap_norms[:, np.newaxis]
         elif self.normalization == "spec":
             return res * np.repeat(self.norm_info[:, 0], self.norm_info[:, 1].astype(int))[
                 :, np.newaxis]
