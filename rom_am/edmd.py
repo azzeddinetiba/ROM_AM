@@ -91,6 +91,10 @@ class EDMD(DMD):
         bigger than the number of observables considered.
 
         """
+        if X.shape[1] <= X.shape[0]:
+            warnings.warn("The input snapshots are tall and skinny, consider DMD for this kind of problems.\
+                eDMD is best suited for fat and short matrices")
+
         if observables is not None:
             for i in range(observables):
                 if i == 0:
