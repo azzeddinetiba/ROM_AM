@@ -34,7 +34,7 @@ class DMD:
                   sorting="abs",
                   Y=None,
                   dt=None,):
-        """Training the dynamic mode decomposition model, using the input data X and Y
+        """Training the dynamic mode decomposition[1] model, using the input data X and Y
 
         Parameters
         ----------
@@ -90,7 +90,7 @@ class DMD:
             The spatial modes of the training data
 
         s : numpy.ndarray, of size(r, )
-            The singular values modes of the training data
+            The singular values of the training data
 
         vh : numpy.ndarray, of size(r, m)
             The time dynamics of the training data
