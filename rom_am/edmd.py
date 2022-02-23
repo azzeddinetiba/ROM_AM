@@ -1,4 +1,3 @@
-from msilib.schema import ODBCSourceAttribute
 import numpy as np
 from .dmd import DMD
 from .pod import POD
@@ -93,7 +92,7 @@ class EDMD(DMD):
         """
         if X.shape[1] <= X.shape[0]:
             warnings.warn("The input snapshots are tall and skinny, consider DMD for this kind of problems.\
-                eDMD is best suited for fat and short matrices")
+                 eDMD is best suited for fat and short matrices")
 
         if observables is not None:
             for i in range(observables):
@@ -140,7 +139,7 @@ class EDMD(DMD):
         w = w[:, idx]
         self.low_dim_eig = w
 
-        # Computing the high-dimensional DMD modes [1]
+        # Computing the high-dimensional DMD modes
         phi = w.copy()
         omega = np.log(lambd) / dt  # Continuous system eigenvalues
 

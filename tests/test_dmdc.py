@@ -1,5 +1,3 @@
-import pytest
-import sys
 import numpy as np
 from rom_am import DMDc
 
