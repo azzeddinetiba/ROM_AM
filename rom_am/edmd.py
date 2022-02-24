@@ -90,6 +90,10 @@ class EDMD(DMD):
         bigger than the number of observables considered.
 
         """
+        self._rectangular = False
+        if X.shape != Y.shape:
+            self._rectangular = True
+
         if X.shape[1] <= X.shape[0]:
             warnings.warn("The input snapshots are tall and skinny, consider DMD for this kind of problems.\
                  eDMD is best suited for fat and short matrices")
@@ -133,24 +137,27 @@ class EDMD(DMD):
         self._A = A1 @ A2_pinv
 
         # Eigendecomposition on the Koopman operator
-        lambd, w = np.linalg.eig(self.A)
-        if sorting == "abs":
-            idx = (np.abs(lambd)).argsort()[::-1]
-        else:
-            idx = (np.real(lambd)).argsort()[::-1]
-        lambd = lambd[idx]
-        w = w[:, idx]
-        self.low_dim_eig = w
+        if not self._rectangular:
+            lambd, w = np.linalg.eig(self.A)
+            if sorting == "abs":
+                idx = (np.abs(lambd)).argsort()[::-1]
+            else:
+                idx = (np.real(lambd)).argsort()[::-1]
+            lambd = lambd[idx]
+            w = w[:, idx]
+            self.low_dim_eig = w
 
-        # Computing the high-dimensional DMD modes
-        phi = w.copy()
-        omega = np.log(lambd) / dt  # Continuous system eigenvalues
+            # Computing the high-dimensional DMD modes
+            phi = w.copy()
+            omega = np.log(lambd) / dt  # Continuous system eigenvalues
+
+            # Loading the DMD instance's attributes
+            self.dmd_modes = phi
+            self.lambd = lambd
+            self.eigenvalues = omega
 
         # Loading the DMD instance's attributes
         self.dt = dt
-        self.dmd_modes = phi
-        self.lambd = lambd
-        self.eigenvalues = omega
         self.singvals = s
         self.modes = u
         self.time = vh
