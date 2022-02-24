@@ -23,7 +23,7 @@ class DMD:
         self._kept_rank = None
         self.init = None
         self.A_tilde = None
-        self.__A = None
+        self._A = None
 
     def decompose(self,
                   X,
@@ -249,6 +249,6 @@ class DMD:
         """Compute the high dimensional DMD operator.
 
         """
-        if self.__A is None:
-            self.__A = self.modes @ self.A_tilde @ self.modes.T
-        return self.__A
+        if self._A is None:
+            self._A = self.modes @ self.A_tilde @ self.modes.T
+        return self._A

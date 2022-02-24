@@ -95,12 +95,15 @@ class EDMD(DMD):
                  eDMD is best suited for fat and short matrices")
 
         if observables is not None:
-            for i in range(observables):
+            for i in range(len(observables)):
                 if i == 0:
-                    X = observables[0](X)
-                    Y = observables[0](Y)
-                X = np.vtstack((X, observables[i](X)))
-                Y = np.vtstack((X, observables[i](Y)))
+                    tempX = observables[0](X)
+                    tempY = observables[0](Y)
+                else:
+                    tempX = np.vstack((tempX, observables[i](X)))
+                    tempY = np.vstack((tempY, observables[i](Y)))
+            X = tempX
+            Y = tempY
 
         self.tikhonov = tikhonov
         if self.tikhonov:
@@ -123,11 +126,11 @@ class EDMD(DMD):
         s_inv_ = s_inv.copy()
         if self.tikhonov:
             s_inv_ *= s**2 / (s**2 + self.tikhonov * self.x_cond)
-        A2_pinv = np.linalg.multi_dot((vh.T, s_inv_, u.T))
+        A2_pinv = np.linalg.multi_dot((vh.T, np.diag(s_inv_), u.T))
         self._kept_rank = self.pod_.kept_rank
 
         # Computing the Koopman operator approximation
-        self.__A = A1 @ A2_pinv
+        self._A = A1 @ A2_pinv
 
         # Eigendecomposition on the Koopman operator
         lambd, w = np.linalg.eig(self.A)
