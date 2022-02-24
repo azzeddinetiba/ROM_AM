@@ -123,6 +123,8 @@ DATA/*/*.mat
 DATA/*/*.h3d
 DATA/*/*.csv
 DATA/*/*.oml
+References/*/*.png
+References/*/*.pdf
 
 .idea/
 *.DS_Store
