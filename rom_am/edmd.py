@@ -93,6 +93,8 @@ class EDMD(DMD):
         self._rectangular = False
         if X.shape != Y.shape:
             self._rectangular = True
+        self._dim_Y = Y.shape[0]
+        self._dim_X = X.shape[0]
 
         if X.shape[1] <= X.shape[0]:
             warnings.warn("The input snapshots are tall and skinny, consider DMD for this kind of problems.\
@@ -170,3 +172,49 @@ class EDMD(DMD):
         b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
         b /= np.exp(self.eigenvalues * t1)
         return b
+
+    def predict(self, t, t1=0, method=0, rank=None, stabilize=False, x_input=None):
+        """Predict the eDMD solution on the prescribed time instants.
+
+        Parameters
+        ----------
+        t : numpy.ndarray, size (nt, )
+            time steps at which the DMD solution will be computed
+            If x_input is given, this argument is disregarded
+        t1: float
+            the value of the time instant of the first snapshot
+            If x_input is given, this argument is disregarded
+        rank: int or None
+            ranks kept for prediction: it should be a hard threshold integer
+            and greater than the rank chose/computed in the decomposition
+            phase. If None, the same rank already computed is used
+            Default : None
+            If x_input is given, this argument is disregarded
+        method: int
+            Method used to compute the initial mode amplitudes
+            0 if it is computed on the POD subspace as in Tu et al.[1]
+            1 if it is computed using the pseudoinverse of the DMD modes
+            Default : 0
+            If x_input is given, this argument is disregarded
+        stabilize : bool, optional
+            DMD eigenvalue-shifting to stable eigenvalues at the prediction
+            phase
+            Default : False
+            If x_input is given, this argument is disregarded
+        u_input: numpy.ndarray, size (n, nt)
+            Values of X data in the prediction phase. Should be given
+            in case the eDMD operator is rectangular, i.e X and Y do not have
+            the same dimensions
+        Returns
+        ----------
+            numpy.ndarray, size (N, nt)
+            ROM solution on the time values t
+        """
+        if self._rectangular:
+            data = np.zeros(
+                (self._dim_Y, x_input.shape[1]), dtype=complex)
+            for i in range(x_input.shape[1]):
+                data[:, i] = self.A @ x_input[:, i]
+            return data
+        else:
+            return super().predict(t, t1, method, rank, stabilize)
