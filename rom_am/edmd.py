@@ -90,6 +90,22 @@ class EDMD(DMD):
         bigger than the number of observables considered.
 
         """
+        if observables is not None:
+            if "X" in observables:
+                for i in range(len(observables["X"])):
+                    if i == 0:
+                        tempX = observables["X"][0](X)
+                    else:
+                        tempX = np.vstack((tempX, observables["X"][i](X)))
+                X = tempX
+            if "Y" in observables:
+                for i in range(len(observables["Y"])):
+                    if i == 0:
+                        tempY = observables["Y"][0](Y)
+                    else:
+                        tempY = np.vstack((tempY, observables["Y"][i](Y)))
+                Y = tempY
+
         self._rectangular = False
         if X.shape != Y.shape:
             self._rectangular = True
@@ -99,17 +115,6 @@ class EDMD(DMD):
         if X.shape[1] <= X.shape[0]:
             warnings.warn("The input snapshots are tall and skinny, consider DMD for this kind of problems.\
                  eDMD is best suited for fat and short matrices")
-
-        if observables is not None:
-            for i in range(len(observables)):
-                if i == 0:
-                    tempX = observables[0](X)
-                    tempY = observables[0](Y)
-                else:
-                    tempX = np.vstack((tempX, observables[i](X)))
-                    tempY = np.vstack((tempY, observables[i](Y)))
-            X = tempX
-            Y = tempY
 
         self.tikhonov = tikhonov
         if self.tikhonov:
