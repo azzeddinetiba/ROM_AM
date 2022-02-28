@@ -6,9 +6,9 @@ from rom_am import EDMD
 Tests on Extended DMD based on the nonlinear spring example (with unsteady
 pressure load) studied in the eDMD_Spring example
 """
-input_t = np.load("tests/DATA/edmd_input_t.npy")
+input_t = np.load("./tests/DATA/edmd_input_t.npy")
 train_t = input_t[:int(0.7*input_t.shape[0])]
-input_data = np.load("tests/DATA/edmd_input_data.npy")
+input_data = np.load("./tests/DATA/edmd_input_data.npy")
 dt = 6e-4
 
 mass = 1000
@@ -42,8 +42,8 @@ def v_dot(u, t): return c * u**3 + b * u**2 + a * u + d(t)
 
 correct_model = model_param(0)[[0, 1, 2, 4, 5]]
 
-X = np.load("tests/DATA/edmd_train_X.npy")
-Y = np.load("tests/DATA/edmd_train_Y.npy")
+X = np.load("./tests/DATA/edmd_train_X.npy")
+Y = np.load("./tests/DATA/edmd_train_Y.npy")
 observables = {"X": [lambda x: x, lambda x: x**2, lambda x: x**3, lambda x: np.ones((1, X.shape[1])), lambda x: p(train_t).reshape((1, -1))],
                "Y": [lambda x: v_dot(x, train_t)]}
 
