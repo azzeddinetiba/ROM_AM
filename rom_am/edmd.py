@@ -216,10 +216,6 @@ class EDMD(DMD):
             ROM solution on the time values t
         """
         if self._rectangular:
-            data = np.zeros(
-                (self._dim_Y, x_input.shape[1]), dtype=complex)
-            for i in range(x_input.shape[1]):
-                data[:, i] = self.A @ x_input[:, i]
-            return data
+            return self.A @ x_input
         else:
             return super().predict(t, t1, method, rank, stabilize)
