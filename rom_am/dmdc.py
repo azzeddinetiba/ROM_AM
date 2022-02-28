@@ -1,5 +1,4 @@
 import numpy as np
-from numpy import newaxis
 from .pod import POD
 
 
