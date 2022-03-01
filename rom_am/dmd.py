@@ -23,6 +23,7 @@ class DMD:
         self._kept_rank = None
         self.init = None
         self.A_tilde = None
+        self._A = None
 
     def decompose(self,
                   X,
@@ -33,7 +34,7 @@ class DMD:
                   sorting="abs",
                   Y=None,
                   dt=None,):
-        """Training the dynamic mode decomposition model, using the input data X and Y
+        """Training the dynamic mode decomposition[1] model, using the input data X and Y
 
         Parameters
         ----------
@@ -89,7 +90,7 @@ class DMD:
             The spatial modes of the training data
 
         s : numpy.ndarray, of size(r, )
-            The singular values modes of the training data
+            The singular values of the training data
 
         vh : numpy.ndarray, of size(r, m)
             The time dynamics of the training data
@@ -167,6 +168,10 @@ class DMD:
             0 if it is computed on the POD subspace as in Tu et al.[1]
             1 if it is computed using the pseudoinverse of the DMD modes
             Default : 0
+        stabilize : bool, optional
+            DMD eigenvalue-shifting to stable eigenvalues at the prediction
+            phase
+            Default : False
 
         Returns
         ----------
@@ -183,16 +188,7 @@ class DMD:
             rank chosen/computed at the decomposition phase. Please see the rank value in self.kept_rank')
             rank = self._kept_rank
 
-        self.t1 = t1
-        if method:
-            init = self.init
-            b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
-            b /= np.exp(self.eigenvalues * t1)
-        else:
-            alpha1 = self.singvals * self.time[:, 0]
-            b = np.linalg.solve(self.lambd * self.low_dim_eig, alpha1) / np.exp(
-                self.eigenvalues * t1
-            )
+        b = self._compute_amplitudes(t1, method)
 
         eig = self.eigenvalues[:rank]
         if stabilize:
@@ -232,6 +228,27 @@ class DMD:
 
         t = np.linspace(self.t1, self.t1 + (self.n_timesteps - 1)
                         * self.dt, self.n_timesteps)
-        y0 = np.linalg.multi_dot((self.modes[:, :rank], np.diag(
-            self.singvals[:rank]), self.time[:rank, 0])).reshape((-1, 1))
+        y0 = self.init.reshape((-1, 1))
         return np.hstack((y0, self.predict(t, t1=self.t1)))
+
+    def _compute_amplitudes(self, t1, method):
+        self.t1 = t1
+        if method:
+            init = self.init
+            b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
+            b /= np.exp(self.eigenvalues * t1)
+        else:
+            alpha1 = self.singvals * self.time[:, 0]
+            b = np.linalg.solve(self.lambd * self.low_dim_eig, alpha1) / np.exp(
+                self.eigenvalues * t1
+            )
+        return b
+
+    @property
+    def A(self):
+        """Compute the high dimensional DMD operator.
+
+        """
+        if self._A is None:
+            self._A = self.modes @ self.A_tilde @ self.modes.T
+        return self._A
