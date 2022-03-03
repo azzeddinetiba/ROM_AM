@@ -118,9 +118,9 @@ DATA/*/*.txt
 DATA/*.mat
 DATA/*/*.mat
 !DATA/.gitkeep 
-DATA/*/*.csv
-DATA/*/*.h3d
-DATA/*/*.oml
+DATA/*/*/*.csv
+DATA/*/*/**.h3d
+DATA/*/*/*.oml
 
 /Figures/*
 /examples/fsi_test_case figures.ipynb
