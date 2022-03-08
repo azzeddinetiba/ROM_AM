@@ -178,7 +178,7 @@ class EDMD(DMD):
         b /= np.exp(self.eigenvalues * t1)
         return b
 
-    def predict(self, t, t1=0, method=0, rank=None, stabilize=False, x_input=None):
+    def predict(self, t, t1=0, method=1, rank=None, stabilize=False, x_input=None):
         """Predict the eDMD solution on the prescribed time instants.
 
         Parameters
