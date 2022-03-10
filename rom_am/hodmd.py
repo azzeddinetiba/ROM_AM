@@ -26,11 +26,11 @@ class HODMD(DMD):
         self._ho_kept_rank = self.pod_.kept_rank
 
         new_X = u.T @ np.hstack((X, Y[:, -1].reshape((-1, 1))))
-        ho_X_ = np.zeros((hod * new_X.shape[0], new_X.shape[1]+1-hod))
+        ho_X_ = np.empty((hod * new_X.shape[0], new_X.shape[1]+1-hod))
 
         for i in range(hod):
-            ho_X_[i*X.shape[0]:(i+1) * X.shape[0],
-                  :] = new_X[:X.shape[0], i:i+(new_X.shape[1]+1-hod)]
+            ho_X_[i*new_X.shape[0]:(i+1) * new_X.shape[0],
+                  :] = new_X[:, i:i+(new_X.shape[1]+1-hod)]
 
         ho_X = ho_X_[:, :-1]
         ho_Y = ho_X_[:, 1::]
