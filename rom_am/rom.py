@@ -165,10 +165,10 @@ class ROM:
         """
         t0 = time.time()
         res = self.model.predict(t=t, t1=t1, rank=rank, *args, **kwargs)
-        if self.center:
-            res = self._decenter(res)
         if self.normalize:
             res = self._denormalize(res)
+        if self.center:
+            res = self._decenter(res)
         t1 = time.time()
         self.profile["Prediction time"] = t1-t0
         return res
