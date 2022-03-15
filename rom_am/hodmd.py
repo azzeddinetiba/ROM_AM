@@ -27,7 +27,7 @@ class HODMD(DMD):
 
         self.data = np.hstack((X, Y[:, -1].reshape((-1, 1))))
         new_X = u.T @ self.data
-        ho_X_ = np.zeros((hod * new_X.shape[0], new_X.shape[1]+1-hod))
+        ho_X_ = np.empty((hod * new_X.shape[0], new_X.shape[1]+1-hod))
 
         for i in range(hod):
             ho_X_[i*X.shape[0]:(i+1) * X.shape[0],
