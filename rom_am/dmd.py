@@ -149,7 +149,7 @@ class DMD:
 
         return u, s, vh
 
-    def predict(self, t, t1=0, method=0, rank=None, stabilize=False):
+    def predict(self, t, t1=0, method=0, rank=None, stabilize=True):
         """Predict the DMD solution on the prescribed time instants.
 
         Parameters
@@ -171,7 +171,7 @@ class DMD:
         stabilize : bool, optional
             DMD eigenvalue-shifting to stable eigenvalues at the prediction
             phase
-            Default : False
+            Default : True
 
         Returns
         ----------
@@ -226,8 +226,8 @@ class DMD:
             warnings.warn('the initial instant value was not assigned during the prediction phase,\
                 t1 is chosen as 0')
 
-        t = np.linspace(self.t1, self.t1 + (self.n_timesteps - 1)
-                        * self.dt, self.n_timesteps)
+        t = np.linspace(self.t1 + self.dt, self.t1 + (self.n_timesteps - 2)
+                        * self.dt, self.n_timesteps - 1)
         y0 = self.init.reshape((-1, 1))
         return np.hstack((y0, self.predict(t, t1=self.t1)))
 

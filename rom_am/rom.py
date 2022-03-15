@@ -304,7 +304,10 @@ class ROM:
         return self.model.reconstruct(rank)
 
     @property
-    def accuracy(self, rank=None, t=None, ref=None, t1=0):
+    def accuracy(self,):
+        return self.get_accuracy()
+
+    def get_accuracy(self, rank=None, t=None, ref=None, t1=0):
         """Gives the accuracy of the ROM, compared to the input data or to reference values
 
         Parameters
