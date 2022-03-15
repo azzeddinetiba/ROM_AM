@@ -179,7 +179,7 @@ class ROM:
         Parameters
         ----------
         rank: int or None
-            ranks kept for prediction: it should be a hard threshold integer
+            ranks kept for reconstruction: it should be a hard threshold integer
             and greater than the rank chose/computed in the decomposition
             phase. If None, the same rank already computed is used
             Default : None 
@@ -299,3 +299,45 @@ class ROM:
             the decentered data based on the mean of the input snapshots
         """
         return res + self.mean_flow.reshape((-1, 1))
+
+    def reconstruct(self, rank=None):
+        return self.model.reconstruct(rank)
+
+    @property
+    def accuracy(self, rank=None, t=None, ref=None, t1=0):
+        """Gives the accuracy of the ROM, compared to the input data or to reference values
+
+        Parameters
+        ----------
+        rank: int
+            ranks kept for prediction/reconstruction: it should be a hard
+            threshold integer and greater than the rank chose/computed in
+            the decomposition phase. If None, the same rank already computed
+            is used
+            Default : None
+        t: ndarray (m, )
+            The time instants of the ROM solution to be compared to the
+            reference
+            in case it is not assigned, the accuracy is copmputed for
+            reconstruction (compared to the input snapshots)
+        ref: ndarray (N, m)
+            The reference solution to which the ROM solution is compared,
+            in case it is not assigned, the accuracy is copmputed for
+            reconstruction (compared to the input snapshots)
+            has the same axis 1 dimension as the axis 0 in the 't' argument
+        t1: float
+            the value of the time instant of the first snapshot
+
+        Returns
+        ----------
+            float
+            the relative error of the ROM
+        """
+        if t is None:
+            err = np.linalg.norm(self.reconstruct(
+                rank=rank) - self.snapshots, axis=0)/np.linalg.norm(self.snapshots, axis=0)
+            return err.sum()/err.shape[0]
+        else:
+            err = np.linalg.norm(self.predict(
+                t=t, rank=rank, t1=t1) - ref, axis=0)/np.linalg.norm(ref, axis=0)
+            return err.sum()/err.shape[0]
