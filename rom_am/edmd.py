@@ -108,6 +108,7 @@ class EDMD(DMD):
 
         self._rectangular = False
         if X.shape != Y.shape:
+            self._train_data = X.copy()
             self._rectangular = True
         self._dim_Y = Y.shape[0]
         self._dim_X = X.shape[0]
@@ -178,7 +179,7 @@ class EDMD(DMD):
         b /= np.exp(self.eigenvalues * t1)
         return b
 
-    def predict(self, t, t1=0, method=1, rank=None, stabilize=False, x_input=None):
+    def predict(self, t, t1=0, method=1, rank=None, stabilize=True, x_input=None):
         """Predict the eDMD solution on the prescribed time instants.
 
         Parameters
@@ -219,3 +220,9 @@ class EDMD(DMD):
             return self.A @ x_input
         else:
             return super().predict(t, t1, method, rank, stabilize)
+
+    def reconstruct(self, rank=None):
+        if self._rectangular:
+            return self.predict(t=0, x_input=self._train_data)
+        else:
+            return super().reconstruct(rank)

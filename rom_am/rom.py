@@ -34,6 +34,7 @@ class ROM:
         self.norm_info = None
         self.Y = None
         self.Y_input = None
+        self._accuracy = None
 
     def decompose(
             self,
@@ -337,10 +338,16 @@ class ROM:
             float
             the relative error of the ROM
         """
+        if self.Y is None:
+            self._trained_on = self.snapshots.copy()
+        else:
+            self._trained_on = self.Y.copy()
         if t is None:
-            err = np.linalg.norm(self.reconstruct(
-                rank=rank) - self.snapshots, axis=0)/np.linalg.norm(self.snapshots, axis=0)
-            return err.sum()/err.shape[0]
+            if self._accuracy is None:
+                err = np.linalg.norm(self.reconstruct(
+                    rank=rank) - self._trained_on, axis=0)/np.linalg.norm(self._trained_on, axis=0)
+                self._accuracy = err.sum()/err.shape[0]
+            return self._accuracy
         else:
             err = np.linalg.norm(self.predict(
                 t=t, rank=rank, t1=t1) - ref, axis=0)/np.linalg.norm(ref, axis=0)

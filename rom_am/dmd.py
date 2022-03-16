@@ -226,10 +226,9 @@ class DMD:
             warnings.warn('the initial instant value was not assigned during the prediction phase,\
                 t1 is chosen as 0')
 
-        t = np.linspace(self.t1 + self.dt, self.t1 + (self.n_timesteps - 2)
-                        * self.dt, self.n_timesteps - 1)
-        y0 = self.init.reshape((-1, 1))
-        return np.hstack((y0, self.predict(t, t1=self.t1)))
+        t = np.linspace(self.t1 + self.dt, self.t1 + (self.n_timesteps - 1)
+                        * self.dt, self.n_timesteps)
+        return self.predict(t, t1=self.t1)
 
     def _compute_amplitudes(self, t1, method):
         self.t1 = t1
