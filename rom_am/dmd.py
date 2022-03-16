@@ -233,9 +233,17 @@ class DMD:
 
     def _compute_amplitudes(self, t1, method):
         self.t1 = t1
-        if method:
+        if method == 1:
             init = self.init
             b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
+            b /= np.exp(self.eigenvalues * t1)
+        elif method == 2:
+            L = self.low_dim_eig[:self._ho_kept_rank, :] @ np.tile(np.eye(self.lambd.shape[0]), self.n_timesteps) * np.tile(self.lambd, self.n_timesteps)**np.repeat(
+                np.linspace(1, self.n_timesteps, self.n_timesteps, dtype=int), self.lambd.shape[0])
+            L = np.vstack((self.low_dim_eig[:self._ho_kept_rank, :], L.reshape(
+                self.low_dim_eig[:self._ho_kept_rank, :].shape[0], -1, self.lambd.shape[0]).swapaxes(0, 1).reshape((-1, self.lambd.shape[0]))))
+            b, _, _, _ = np.linalg.lstsq(
+                L, (self.modes.T @ self.data).reshape((-1, 1), order='F').ravel(), rcond=None)
             b /= np.exp(self.eigenvalues * t1)
         else:
             alpha1 = self.singvals * self.time[:, 0]
