@@ -60,7 +60,8 @@ class HODMD(DMD):
                                     Y=ho_Y,
                                     dt=dt,)
 
-        # Loading the HODMD instance's attributes, overriding DMD
+        # Loading the HODMD instance's attributes, overriding DMD's
+        self.ho_modes = self.modes.copy()
         self.singvals = s
         self.modes = u
         self.time = vh
@@ -73,3 +74,12 @@ class HODMD(DMD):
 
     def predict(self, t, t1=0, rank=None, stabilize=False):
         return super().predict(t=t, t1=t1, method=2, rank=rank, stabilize=stabilize)
+
+    @property
+    def A(self):
+        """Computes the high dimensional DMD operator.
+
+        """
+        if self._A is None:
+            self._A = self.ho_modes @ self.A_tilde @ self.ho_modes.T
+        return self._A

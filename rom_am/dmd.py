@@ -254,7 +254,7 @@ class DMD:
 
     @property
     def A(self):
-        """Compute the high dimensional DMD operator.
+        """Computes the high dimensional DMD operator.
 
         """
         if self._A is None:
