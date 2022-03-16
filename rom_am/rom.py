@@ -308,7 +308,8 @@ class ROM:
         return self.get_accuracy()
 
     def get_accuracy(self, rank=None, t=None, ref=None, t1=0):
-        """Gives the accuracy of the ROM, compared to the input data or to reference values
+        """Gives the accuracy of the ROM, in terms of an L2 norm of the error
+        compared to the input data or to reference values
 
         Parameters
         ----------
