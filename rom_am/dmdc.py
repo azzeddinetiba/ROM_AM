@@ -102,6 +102,9 @@ class DMDc:
 
 
         """
+        self._train_data = X
+        self._trained_on = Y
+        self._train_input = Y_input
         self.tikhonov = tikhonov
         if self.tikhonov:
             self.x_cond = np.linalg.cond(X)
@@ -160,7 +163,7 @@ class DMDc:
 
         return u, s, vh
 
-    def predict(self, t, t1=0, rank=None, x_input=None, u_input=None, fixed_input=False, stabilize=False, method=0):
+    def predict(self, t, t1=0, rank=None, x_input=None, u_input=None, fixed_input=False, stabilize=True, method=0):
         """Predict the DMD solution on the prescribed time instants.
 
         Parameters
@@ -239,6 +242,9 @@ class DMDc:
 
             return self.dmd_modes[:, :rank] @ ((np.exp(np.outer(eig, t).T) * b).T
                                                - (self.control_component @ u_input[:, 0] / eig)[:, np.newaxis])
+
+    def reconstruct(self, rank=None):
+        return self.predict(0, rank=rank, x_input=self._train_data, u_input=self._train_input)
 
     @property
     def A(self):
