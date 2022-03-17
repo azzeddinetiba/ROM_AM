@@ -22,6 +22,8 @@ class DMDc:
         self._kept_rank = None
         self.init = None
         self.input_init = None
+        self._A = None
+        self._B = None
 
     def decompose(self,
                   X,
@@ -190,7 +192,7 @@ class DMDc:
             0 if it is computed on the POD subspace as in Tu et al.[1]
             1 if it is computed using the pseudoinverse of the DMD modes
             Default : 0
-            
+
         Returns
         ----------
             numpy.ndarray, size (N, nt)
@@ -237,3 +239,21 @@ class DMDc:
 
             return self.dmd_modes[:, :rank] @ ((np.exp(np.outer(eig, t).T) * b).T
                                                - (self.control_component @ u_input[:, 0] / eig)[:, np.newaxis])
+
+    @property
+    def A(self):
+        """Computes the high dimensional DMDc A operator.
+
+        """
+        if self._A is None:
+            self._A = self.u_hat @ self.A_tilde @ self.u_hat.T
+        return self._A
+
+    @property
+    def B(self):
+        """Computes the high dimensional DMDc A operator.
+
+        """
+        if self._B is None:
+            self._B = self.u_hat @ self.B_tilde
+        return self._B
