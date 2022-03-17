@@ -257,7 +257,7 @@ class DMDc:
 
     @property
     def B(self):
-        """Computes the high dimensional DMDc A operator.
+        """Computes the high dimensional DMDc B operator.
 
         """
         if self._B is None:
