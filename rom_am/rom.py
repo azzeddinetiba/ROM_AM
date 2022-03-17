@@ -339,14 +339,17 @@ class ROM:
             the relative error of the ROM
         """
         if self.Y is None:
-            self._trained_on = self.snapshots.copy()
+            self._trained_on = self.snapshots
         else:
-            self._trained_on = self.Y.copy()
+            self._trained_on = self.Y
         if t is None:
             if self._accuracy is None:
-                err = np.linalg.norm(self.reconstruct(
-                    rank=rank) - self._trained_on, axis=0)/np.linalg.norm(self._trained_on, axis=0)
-                self._accuracy = err.sum()/err.shape[0]
+                try:
+                    self._accuracy = self.model.accuracy
+                except AttributeError:
+                    err = np.linalg.norm(self.reconstruct(
+                        rank=rank) - self._trained_on, axis=0)/np.linalg.norm(self._trained_on, axis=0)
+                    self._accuracy = err.sum()/err.shape[0]
             return self._accuracy
         else:
             err = np.linalg.norm(self.predict(

@@ -10,6 +10,10 @@ class EDMD(DMD):
 
     """
 
+    def __init__(self):
+        super().__init__()
+        self._accuracy = None
+
     def decompose(self, X, alg="svd", rank=0, opt_trunc=False, tikhonov=0, sorting="abs", Y=None, dt=None, observables=None):
         """Training the extended dynamic mode decomposition[1, 3] model, using the input data X and Y
             Cases where the number of timesteps is much bigger than the number of observables
@@ -108,7 +112,8 @@ class EDMD(DMD):
 
         self._rectangular = False
         if X.shape != Y.shape:
-            self._train_data = X.copy()
+            self._train_data = X
+            self._trained_on = Y
             self._rectangular = True
         self._dim_Y = Y.shape[0]
         self._dim_X = X.shape[0]
@@ -226,3 +231,14 @@ class EDMD(DMD):
             return self.predict(t=0, x_input=self._train_data)
         else:
             return super().reconstruct(rank)
+
+    @property
+    def accuracy(self,):
+        return self.get_accuracy()
+
+    def get_accuracy(self, rank=None):
+        if self._accuracy is None:
+            err = np.linalg.norm(self.reconstruct(
+                rank=rank) - self._trained_on, axis=0)/np.linalg.norm(self._trained_on, axis=0)
+            self._accuracy = err.sum()/err.shape[0]
+        return self._accuracy
