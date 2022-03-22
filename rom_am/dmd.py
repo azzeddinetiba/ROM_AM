@@ -24,6 +24,7 @@ class DMD:
         self.init = None
         self.A_tilde = None
         self._A = None
+        self._no_reduction = False
 
     def decompose(self,
                   X,
@@ -33,7 +34,8 @@ class DMD:
                   tikhonov=0,
                   sorting="abs",
                   Y=None,
-                  dt=None,):
+                  dt=None,
+                  no_reduc=False):
         """Training the dynamic mode decomposition[1] model, using the input data X and Y
 
         Parameters
@@ -105,37 +107,47 @@ class DMD:
         self.n_timesteps = X.shape[1]
         self.init = X[:, 0]
 
-        # POD Decomposition of the X matrix
-        self.pod_ = POD()
-        self.pod_.decompose(X, alg=alg, rank=rank,
-                            opt_trunc=opt_trunc)
-        u = self.pod_.modes
-        vh = self.pod_.time
-        s = self.pod_.singvals
-        self._kept_rank = self.pod_.kept_rank
+        if not no_reduc:
+            # POD Decomposition of the X matrix
+            self.pod_ = POD()
+            self.pod_.decompose(X, alg=alg, rank=rank,
+                                opt_trunc=opt_trunc)
+            u = self.pod_.modes
+            vh = self.pod_.time
+            s = self.pod_.singvals
+            self._kept_rank = self.pod_.kept_rank
 
-        # Computing the A_tilde: the projection of the 'A' operator
-        # on the POD modes, where A = Y * pseudoinverse(X) [1]
-        s_inv = np.zeros(s.shape)
-        s_inv = 1 / s
-        s_inv_ = s_inv.copy()
-        if self.tikhonov:
-            s_inv_ *= s**2 / (s**2 + self.tikhonov * self.x_cond)
-        store = np.linalg.multi_dot((Y, vh.T, np.diag(s_inv_)))
-        self.A_tilde = u.T @ store
+            # Computing the A_tilde: the projection of the 'A' operator
+            # on the POD modes, where A = Y * pseudoinverse(X) [1]
+            s_inv = np.zeros(s.shape)
+            s_inv = 1 / s
+            s_inv_ = s_inv.copy()
+            if self.tikhonov:
+                s_inv_ *= s**2 / (s**2 + self.tikhonov * self.x_cond)
+            store = np.linalg.multi_dot((Y, vh.T, np.diag(s_inv_)))
+            self.A_tilde = u.T @ store
 
-        # Eigendecomposition on the low dimensional operator
-        lambd, w = np.linalg.eig(self.A_tilde)
-        if sorting == "abs":
-            idx = (np.abs(lambd)).argsort()[::-1]
-        else:
-            idx = (np.real(lambd)).argsort()[::-1]
-        lambd = lambd[idx]
-        w = w[:, idx]
-        self.low_dim_eig = w
+            # Eigendecomposition on the low dimensional operator
+            lambd, w = np.linalg.eig(self.A_tilde)
+            if sorting == "abs":
+                idx = (np.abs(lambd)).argsort()[::-1]
+            else:
+                idx = (np.real(lambd)).argsort()[::-1]
+            lambd = lambd[idx]
+            w = w[:, idx]
+            self.low_dim_eig = w
 
-        # Computing the high-dimensional DMD modes [1]
-        phi = store @ w
+            # Computing the high-dimensional DMD modes [1]
+            phi = store @ w
+        else: # Should ONLY be used in the context of parametric DMD
+            self._no_reduction = True
+            self._A = Y @ np.linalg.pinv(X)
+            lambd, phi = np.linalg.eig(self._A)
+            
+            s = 0.
+            u = 0.
+            vh = 0.
+
         omega = np.log(lambd) / dt  # Continuous system eigenvalues
 
         # Loading the DMD instance's attributes
