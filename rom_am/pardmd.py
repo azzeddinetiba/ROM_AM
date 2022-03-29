@@ -68,6 +68,7 @@ class ParDMD:
                                                    alg=alg, dt=dt, rank=rank2, opt_trunc=opt_trunc, tikhonov=tikhonov, sorting=sorting)
 
             elif dmd_model == "hodmd":
+                # High-Order DMD Decomposition
                 self.dmd_model = HODMD()
                 _, _, _ = self.dmd_model.decompose(self.stacked_coeff[:, :-1], Y=self.stacked_coeff[:, 1::],
                                                    alg=alg, dt=dt, rank=rank2, opt_trunc=opt_trunc, tikhonov=tikhonov, sorting=sorting, hod=hod)
@@ -81,10 +82,12 @@ class ParDMD:
             for i in range(self._p):
 
                 if dmd_model == "dmd":
+                    # DMD Decomposition
                     tmp_model = DMD()
                     _, _, _ = tmp_model.decompose(self.stacked_coeff[i*self._kept_rank:(i+1)*self._kept_rank, :-1], Y=self.stacked_coeff[i*self._kept_rank:(i+1)*self._kept_rank, 1::],
                                                   alg=alg, dt=dt, rank=rank2, opt_trunc=opt_trunc, tikhonov=tikhonov, sorting=sorting)
                 elif dmd_model == "hodmd":
+                    # High-Order DMD Decomposition
                     tmp_model = HODMD()
                     _, _, _ = tmp_model.decompose(self.stacked_coeff[i*self._kept_rank:(i+1)*self._kept_rank, :-1], Y=self.stacked_coeff[i*self._kept_rank:(i+1)*self._kept_rank, 1::],
                                                   alg=alg, dt=dt, rank=rank2, opt_trunc=opt_trunc, tikhonov=tikhonov, sorting=sorting, hod=hod)
@@ -101,7 +104,8 @@ class ParDMD:
                 t=t, t1=t1, method=0, rank=rank, stabilize=stabilize)  # of shape (n * p, m)
 
         else:
-            sample_res = np.empty((self._kept_rank * self._p, t.shape[0]))
+            sample_res = np.empty(
+                (self._kept_rank * self._p, t.shape[0]), dtype=complex)
             for i in range(self._p):
                 sample_res[i*self._kept_rank:(i+1)*self._kept_rank, :] = self.dmd_model[i].predict(
                     t=t, t1=t1, method=0, rank=rank, stabilize=stabilize)
