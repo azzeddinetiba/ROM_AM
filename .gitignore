@@ -121,6 +121,8 @@ DATA/*/*.mat
 DATA/*/*.csv
 DATA/*/*.h3d
 DATA/*/*.oml
+DATA/Parametric/*/*.npy
+DATA/Parametric/*/*.txt
 
 /Figures/*
 /examples/fsi_test_case figures.ipynb
