@@ -99,6 +99,13 @@ class DMD:
 
 
         """
+        if X.shape[0] != Y.shape[0]:
+            raise Exception("The DMD input snapshots X and Y have to have \
+                the same observables, for different observables in X and Y, \
+                    Please consider using the EDMD() class")
+        if X.shape[1] != Y.shape[1]:
+            raise Exception("The DMD input snapshots X and Y have to have \
+                the same number of instants")
 
         self.tikhonov = tikhonov
         if self.tikhonov:
@@ -139,11 +146,11 @@ class DMD:
 
             # Computing the high-dimensional DMD modes [1]
             phi = store @ w
-        else: # Should ONLY be used in the context of parametric DMD
+        else:  # Should ONLY be used in the context of parametric DMD
             self._no_reduction = True
             self._A = Y @ np.linalg.pinv(X)
             lambd, phi = np.linalg.eig(self._A)
-            
+
             s = 0.
             u = 0.
             vh = 0.
@@ -188,7 +195,7 @@ class DMD:
         Returns
         ----------
             numpy.ndarray, size (N, nt)
-            ROM solution on the time values t
+            DMD solution on the time values t
         """
         if self.dmd_modes is None:
             raise Exception("The DMD decomposition hasn't been executed yet")

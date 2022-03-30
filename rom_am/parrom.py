@@ -3,6 +3,23 @@ import numpy as np
 
 
 class ParROM:
+    """
+    Parametric Non-Intrusive Reduced Order Modeling Class
+
+    ...
+
+    Parameters
+    ----------
+    parrom : python class
+        an instance of a class that represents a method for reduced
+        order modeling it has to have the methods decompose(),
+        reconstruct() and predict()
+
+        The class' decompose() method must take as arguments at least
+        the {X, alg, params, rank1, rank2, opt_trunc, tikhonov} arguments, the predict()
+        has to take at least {t, mu, t1, rank}
+
+    """
 
     def __init__(self, parrom) -> None:
 
@@ -143,12 +160,15 @@ class ParROM:
         return res + self.mean_flow.reshape((-1, 1))
 
     def predict(self, t, mu, t1=0, rank=None, *args, **kwargs):
-        """Predict the solution of the reduced order model on the prescribed time instants.
+        """Predict the solution of the reduced order model on the prescribed time instants and 
+        the target aprameter value.
 
         Parameters
         ----------
         t : numpy.ndarray, size (nt, )
             time steps at which the ROM solution will be computed
+        mu : float
+            Parameter value for prediction
         t1: float
             the value of the time instant of the first snapshot
         rank: int or None
@@ -171,3 +191,10 @@ class ParROM:
         t1 = time.time()
         self.profile["Prediction time"] = t1-t0
         return res
+
+    def get_accuracy(self, t, mu, ref, rank=None, t1=0):
+
+        self._trained_on = self.snapshots
+        err = np.linalg.norm(self.predict(
+            t=t, mu=mu, rank=rank, t1=t1) - ref, axis=0)/np.linalg.norm(ref, axis=0)
+        return err.sum()/err.shape[0]

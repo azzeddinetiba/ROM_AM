@@ -26,7 +26,8 @@ class ParDMD:
                   dmd_model="dmd",
                   hod=50,
                   partitioned=True):
-        """
+        """Training the Parametric dynamic mode decomposition[model, 
+        using the input data X and the training parameters params
 
         Parameters
         ----------
@@ -34,7 +35,39 @@ class ParDMD:
             Parametric snapshot matrix data, of (p, N, m) size
         params : numpy.ndarray
             Parameters in a (p, ) array
-
+        dt : float
+            value of time step from each column in X to the next column
+        alg : str, optional
+            Whether to use the SVD on decomposition ("svd") or
+            the eigenvalue problem on snaphot matrices ("snap")
+            Default : "svd"
+        rank1 : int or float, optional
+            if rank1 = 0 All the ranks are kept, unless their
+            singular values are zero
+            if 0 < rank < 1, it is used as the percentage of
+            the energy that should be kept, and the rank is
+            computed accordingly
+            Default : 0
+        rank2 : int or float, optional
+            if rank = 0 All the ranks are kept, unless their
+            singular values are zero
+            if 0 < rank < 1, it is used as the percentage of
+            the energy that should be kept, and the rank is
+            computed accordingly
+            Default : 0
+        opt_trunc : bool, optional
+            if True an optimal truncation/threshold is estimated,
+            based on the algorithm of Gavish and Donoho [2]
+            Default : False
+        tikhonov : int or float, optional
+            tikhonov parameter for regularization
+            If 0, no regularization is applied, if float, it is used as
+            the lambda tikhonov parameter
+            Default : 0
+        sorting : str, optional
+            Whether to sort the discrete DMD eigenvalues by absolute
+            value ("abs") or by their real part ("real")
+            Default : "abs"
         """
 
         self._p = X.shape[0]  # Number of parameters samples
@@ -98,7 +131,28 @@ class ParDMD:
         return u, s, vh
 
     def predict(self, t, mu, t1, rank=None, stabilize=False):
+        """Predict the parDMD solution on the prescribed time instants and 
+        the target aprameter value.
 
+        Parameters
+        ----------
+        t : numpy.ndarray, size (nt, )
+            time steps at which the parDMD solution will be computed
+        mu : float
+            Parameter value for prediction
+        t1: float
+            the value of the time instant of the first snapshot
+        rank: int or None
+            ranks kept for prediction: it should be a hard threshold integer
+            and greater than the rank chose/computed in the decomposition
+            phase. If None, the same rank already computed is used
+            Default : None 
+
+        Returns
+        ----------
+            numpy.ndarray, size (N, nt)
+            parDMD solution on the time values t and parameter value mu
+        """
         if not self.is_Partitioned:
             sample_res = self.dmd_model.predict(
                 t=t, t1=t1, method=0, rank=rank, stabilize=stabilize)  # of shape (n * p, m)
