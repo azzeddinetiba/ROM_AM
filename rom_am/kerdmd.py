@@ -54,7 +54,7 @@ class KERDMD(DMD):
 
         # Computing the Koopman operator approximation
         self._A = np.linalg.multi_dot(
-            (np.diag(s), vh, XTY, vh.T, np.diag(s_inv)))
+            (np.diag(s_inv), vh, XTY, vh.T, np.diag(s_inv)))
 
         lambd, w = np.linalg.eig(self.A)
         if sorting == "abs":
