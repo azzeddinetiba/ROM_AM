@@ -35,7 +35,7 @@ class DMDc:
                   Y=None,
                   dt=None,
                   Y_input=None,):
-        """Training the dynamic mode decomposition with control model,
+        """Training the dynamic mode decomposition with control[1] model,
                     using the input data X and Y, and Y_input
 
         Parameters
@@ -79,10 +79,10 @@ class DMDc:
         References
         ----------
 
-        [1] On dynamic mode decomposition:  Theory and applications,
-        Journal of Computational Dynamics,1,2,391,421,2014-12-1,
-        Jonathan H. Tu,Clarence W. Rowley,Dirk M. Luchtenburg,
-        Steven L. Brunton,J. Nathan Kutz,2158-2491_2014_2_391,
+        [1] Dynamic Mode Decomposition with Control,
+        SIAM Journal on Applied Dynamical Systems,15,1,142,161,2016,
+        Proctor, Joshua L. and Brunton, Steven L. and Kutz, J. Nathan,
+        doi = {10.1137/15M1013857},
 
         [2] M. Gavish and D. L. Donoho, "The Optimal Hard Threshold for
         Singular Values is 4/sqrt(3) ," in IEEE Transactions on Information
@@ -127,10 +127,9 @@ class DMDc:
 
         s_til_inv = np.zeros(s_til.shape)
         s_til_inv = 1 / s_til
-        s_til_inv_ = s_til_inv.copy()
         if self.tikhonov:
-            s_til_inv_ *= s_til**2 / (s_til**2 + self.tikhonov * self.x_cond)
-        store_ = np.linalg.multi_dot((Y, vh_til.T, np.diag(s_til_inv_)))
+            s_til_inv *= s_til**2 / (s_til**2 + self.tikhonov * self.x_cond)
+        store_ = np.linalg.multi_dot((Y, vh_til.T, np.diag(s_til_inv)))
         store = u_hat.T @ store_
         self.A_tilde = np.linalg.multi_dot((store, u_til_1.T, u_hat))
         self.B_tilde = store @ u_til_2.T

@@ -19,6 +19,7 @@ class HODMD(DMD):
         hod : int
             number of previous snapshots to take into account in the
             DMD decomposition
+            Default : 50
 
         References
         ----------

@@ -118,10 +118,9 @@ class DMD:
         # on the POD modes, where A = Y * pseudoinverse(X) [1]
         s_inv = np.zeros(s.shape)
         s_inv = 1 / s
-        s_inv_ = s_inv.copy()
         if self.tikhonov:
-            s_inv_ *= s**2 / (s**2 + self.tikhonov * self.x_cond)
-        store = np.linalg.multi_dot((Y, vh.T, np.diag(s_inv_)))
+            s_inv *= s**2 / (s**2 + self.tikhonov * self.x_cond)
+        store = np.linalg.multi_dot((Y, vh.T, np.diag(s_inv)))
         self.A_tilde = u.T @ store
 
         # Eigendecomposition on the low dimensional operator
