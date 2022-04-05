@@ -114,35 +114,34 @@ class DMD:
         self.n_timesteps = X.shape[1]
         self.init = X[:, 0]
 
-
         if not no_reduc:
-						# POD Decomposition of the X matrix
-						self.pod_ = POD()
-						self.pod_.decompose(X, alg=alg, rank=rank,
-											opt_trunc=opt_trunc)
-						u = self.pod_.modes
-						vh = self.pod_.time
-						s = self.pod_.singvals
-						self._kept_rank = self.pod_.kept_rank
+            # POD Decomposition of the X matrix
+            self.pod_ = POD()
+            self.pod_.decompose(X, alg=alg, rank=rank,
+                                opt_trunc=opt_trunc)
+            u = self.pod_.modes
+            vh = self.pod_.time
+            s = self.pod_.singvals
+            self._kept_rank = self.pod_.kept_rank
 
-						# Computing the A_tilde: the projection of the 'A' operator
-						# on the POD modes, where A = Y * pseudoinverse(X) [1]
-						s_inv = np.zeros(s.shape)
-						s_inv = 1 / s
-						if self.tikhonov:
-							s_inv *= s**2 / (s**2 + self.tikhonov * self.x_cond)
-						store = np.linalg.multi_dot((Y, vh.T, np.diag(s_inv)))
-						self.A_tilde = u.T @ store
+            # Computing the A_tilde: the projection of the 'A' operator
+            # on the POD modes, where A = Y * pseudoinverse(X) [1]
+            s_inv = np.zeros(s.shape)
+            s_inv = 1 / s
+            if self.tikhonov:
+                s_inv *= s**2 / (s**2 + self.tikhonov * self.x_cond)
+            store = np.linalg.multi_dot((Y, vh.T, np.diag(s_inv)))
+            self.A_tilde = u.T @ store
 
-						# Eigendecomposition on the low dimensional operator
-						lambd, w = np.linalg.eig(self.A_tilde)
-						if sorting == "abs":
-							idx = (np.abs(lambd)).argsort()[::-1]
-						else:
-							idx = (np.real(lambd)).argsort()[::-1]
-						lambd = lambd[idx]
-						w = w[:, idx]
-						self.low_dim_eig = w
+            # Eigendecomposition on the low dimensional operator
+            lambd, w = np.linalg.eig(self.A_tilde)
+            if sorting == "abs":
+                idx = (np.abs(lambd)).argsort()[::-1]
+            else:
+                idx = (np.real(lambd)).argsort()[::-1]
+            lambd = lambd[idx]
+            w = w[:, idx]
+            self.low_dim_eig = w
 
             # Computing the high-dimensional DMD modes [1]
             phi = store @ w
