@@ -64,7 +64,9 @@ class POD:
 
         """
         min_dim = min(X.shape[0], X.shape[1])
-        if rank < 0 or (rank > 1 and not isinstance(rank, int) and not isinstance(rank, np.int64)):
+        if rank < 0 or (rank > 1 and not isinstance(rank, int) and
+                        not isinstance(rank, np.int64) and
+                        not isinstance(rank, np.int32)):
             raise ValueError("Invalid rank value, it should be an integer greater "
                              "than 0 or a float between 0 and 1")
         if rank > min_dim:
