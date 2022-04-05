@@ -128,10 +128,9 @@ class DMD:
             # on the POD modes, where A = Y * pseudoinverse(X) [1]
             s_inv = np.zeros(s.shape)
             s_inv = 1 / s
-            s_inv_ = s_inv.copy()
             if self.tikhonov:
-                s_inv_ *= s**2 / (s**2 + self.tikhonov * self.x_cond)
-            store = np.linalg.multi_dot((Y, vh.T, np.diag(s_inv_)))
+                s_inv *= s**2 / (s**2 + self.tikhonov * self.x_cond)
+            store = np.linalg.multi_dot((Y, vh.T, np.diag(s_inv)))
             self.A_tilde = u.T @ store
 
             # Eigendecomposition on the low dimensional operator
@@ -259,7 +258,7 @@ class DMD:
             L = self.low_dim_eig[:self._ho_kept_rank, :] @ np.tile(np.eye(self.lambd.shape[0]), self.n_timesteps) * np.tile(self.lambd, self.n_timesteps)**np.repeat(
                 np.linspace(1, self.n_timesteps, self.n_timesteps, dtype=int), self.lambd.shape[0])
             L = np.vstack((self.low_dim_eig[:self._ho_kept_rank, :], L.reshape(
-                self.low_dim_eig[:self._ho_kept_rank, :].shape[0], -1, self.lambd.shape[0]).swapaxes(0, 1).reshape((-1, self.lambd.shape[0]))))
+                self._ho_kept_rank, -1, self.lambd.shape[0]).swapaxes(0, 1).reshape((-1, self.lambd.shape[0]))))
             b, _, _, _ = np.linalg.lstsq(
                 L, (self.modes.T @ self.data).reshape((-1, 1), order='F').ravel(), rcond=None)
             b /= np.exp(self.eigenvalues * t1)

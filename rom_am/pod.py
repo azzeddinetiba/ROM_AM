@@ -104,16 +104,28 @@ class POD:
             lambd = np.flip(lambd)
             v = np.flip(v, 1)
             lambd[lambd < 1e-10] = 0
+            s = np.sqrt(lambd)
 
-            if rank == 0:
-                rank = len(lambd[lambd > 1e-10])
+            if opt_trunc:
+                if X.shape[0] <= X.shape[1]:
+                    beta = X.shape[0]/X.shape[1]
+                else:
+                    beta = X.shape[1]/X.shape[0]
+                omega = 0.56 * beta**3 - 0.95 * beta**2 + 1.82 * beta + 1.43
+                tau = np.median(s) * omega
+                rank = np.sum(s > tau)
+            else:
+                if rank == 0:
+                    rank = len(lambd[lambd > 1e-10])
+                elif 0 < rank < 1:
+                    rank = np.searchsorted(
+                        np.cumsum(s**2 / (s**2).sum()), rank) + 1
 
-            v = v[:, :rank]
-            vh = v.T
-
-            s = np.sqrt(lambd[:rank])
+            s = s[:rank]
             s_inv = np.zeros(s.shape)
             s_inv[s > 1e-10] = 1.0 / s[s > 1e-10]
+            v = v[:, :rank]
+            vh = v.T
 
             u = X @ v[:, :rank] * s_inv
 
