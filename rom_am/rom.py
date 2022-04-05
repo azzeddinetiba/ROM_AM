@@ -16,8 +16,8 @@ class ROM:
         reconstruct() and predict()
 
         The class' decompose() method must take as arguments at least
-        the same arguments of ROM.decompose(), same thing for
-        ROM.reconstruct() and ROM.predict()
+        the {X, alg, rank, opt_trunc, tikhonov} arguments, the predict()
+        has to take at least {t, t1, rank} and {rank} for reconstruct
 
     """
 

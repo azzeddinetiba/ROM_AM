@@ -58,7 +58,7 @@ class HODMD(DMD):
                                     tikhonov=0,
                                     sorting=sorting,
                                     Y=ho_Y,
-                                    dt=dt,)
+                                    dt=dt,) # No truncation for the second reduction for now
 
         # Loading the HODMD instance's attributes, overriding DMD's
         self.ho_modes = self.modes.copy()
@@ -72,7 +72,8 @@ class HODMD(DMD):
 
         return u, s, vh
 
-    def predict(self, t, t1=0, rank=None, stabilize=False):
+    def predict(self, t, t1=0, rank=None, stabilize=False, method=2):
+        # Only method = 2 for now
         return super().predict(t=t, t1=t1, method=2, rank=rank, stabilize=stabilize)
 
     @property
