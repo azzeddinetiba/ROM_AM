@@ -10,7 +10,16 @@ class HODMD(DMD):
 
     """
 
-    def decompose(self, X, alg="svd", rank=0, opt_trunc=False, tikhonov=0, sorting="abs", Y=None, dt=None, hod=50):
+    def decompose(self,
+                  X,
+                  alg="svd",
+                  rank=0,
+                  opt_trunc=False,
+                  tikhonov=0,
+                  sorting="abs",
+                  Y=None,
+                  dt=None,
+                  hod=50):
         """Training the High Order dynamic mode decomposition[1] model,
         using the input data X and Y
 
@@ -29,6 +38,17 @@ class HODMD(DMD):
         16(2):882–925, 2017
 
         """
+        if hod < 0 or (not isinstance(rank, int) and not isinstance(rank, np.int64)):
+            raise ValueError("Invalid 'hod' value, it should be an integer greater "
+                             "than 0")
+        if hod > X.shape[1]:
+            raise ValueError("Invalid 'hod' value, it cannot be greater than the number "
+                             "of snapshots")
+        if hod <= X.shape[1] and ((X.shape[1]+1-hod) < 0.01 * (rank*hod)):
+            warnings.warn("The 'd' value is too close to the number of snapshots, "
+                          "it does not enable the modified snapshot matrix to have "
+                          "enough snapshots, the results may be erroneous ")
+
         self.tikhonov = tikhonov
         if self.tikhonov:
             self.x_cond = np.linalg.cond(X)
@@ -43,7 +63,13 @@ class HODMD(DMD):
         self._ho_kept_rank = self.pod_.kept_rank
 
         self.data = np.hstack((X, Y[:, -1].reshape((-1, 1))))
-        new_X = u.T @ self.data
+        # ===== POD coefficients of the training data; size (r, Nt+1) =====
+        s_ = s.copy()
+        if self.tikhonov:
+            s_ = (s**2 + self.tikhonov * self.x_cond) / s
+        new_X = np.diag(s_) @ vh
+
+        # ===== Augmented matrix to contain Hankel bloc matrices of POD coefficients; size (dr, Nt + 1 - d)=====
         ho_X_ = np.empty((hod * new_X.shape[0], new_X.shape[1]+1-hod))
 
         for i in range(hod):
@@ -59,7 +85,7 @@ class HODMD(DMD):
                                     tikhonov=0,
                                     sorting=sorting,
                                     Y=ho_Y,
-                                    dt=dt,) # No truncation for the second reduction for now
+                                    dt=dt,)  # No truncation for the second reduction for now
 
         # Loading the HODMD instance's attributes, overriding DMD's
         self.ho_modes = self.modes.copy()

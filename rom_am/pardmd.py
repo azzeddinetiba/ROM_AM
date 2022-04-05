@@ -89,6 +89,7 @@ class ParDMD:
         u = self.pod_.modes
         vh = self.pod_.time
         s = self.pod_.singvals
+        s_ = s.copy()
         if self.tikhonov:
             s_ = (s**2 + self.tikhonov * self.x_cond) / s
         self._kept_rank = self.pod_.kept_rank

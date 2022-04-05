@@ -202,8 +202,8 @@ class DMD:
         if rank is None:
             rank = self._kept_rank
         elif not (isinstance(rank, int) and 0 < rank < self.kept_rank):
-            warnings.warn('The rank chosen for prediction should be an integer smaller than the\
-            rank chosen/computed at the decomposition phase. Please see the rank value in self.kept_rank')
+            warnings.warn("The rank chosen for prediction should be an integer smaller than the "
+                          "rank chosen/computed at the decomposition phase. Please see the rank value in self.kept_rank")
             rank = self._kept_rank
 
         b = self._compute_amplitudes(t1, method)
@@ -235,14 +235,14 @@ class DMD:
         if rank is None:
             rank = self._kept_rank
         elif not (isinstance(rank, int) and 0 < rank < self.kept_rank):
-            warnings.warn('The rank chosen for reconstruction should be an integer smaller than the\
-            rank chosen/computed at the decomposition phase. Please see the rank value in self.kept_rank')
+            warnings.warn("The rank chosen for reconstruction should be an integer smaller than the "
+                          "rank chosen/computed at the decomposition phase. Please see the rank value in self.kept_rank")
             rank = self._kept_rank
 
         if self.t1 is None:
             self.t1 = 0
-            warnings.warn('the initial instant value was not assigned during the prediction phase,\
-                t1 is chosen as 0')
+            warnings.warn("the initial instant value was not assigned during the prediction phase, "
+                          "t1 is chosen as 0")
 
         t = np.linspace(self.t1 + self.dt, self.t1 + (self.n_timesteps - 1)
                         * self.dt, self.n_timesteps)
