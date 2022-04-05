@@ -100,6 +100,7 @@ class HODMD(DMD):
         return u, s, vh
 
     def predict(self, t, t1=0, rank=None, stabilize=False, method=2):
+        self.pred_rank = self._ho_kept_rank
         # Only method = 2 for now
         return super().predict(t=t, t1=t1, method=2, rank=rank, stabilize=stabilize)
 

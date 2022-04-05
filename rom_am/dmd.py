@@ -25,6 +25,10 @@ class DMD:
         self.A_tilde = None
         self._A = None
         self._no_reduction = False
+        self.pred_rank = None
+        self._pod_coeff = None
+        self.stock = False
+        self.data = None
 
     def decompose(self,
                   X,
@@ -35,7 +39,8 @@ class DMD:
                   sorting="abs",
                   Y=None,
                   dt=None,
-                  no_reduc=False):
+                  no_reduc=False,
+                  stock=False):
         """Training the dynamic mode decomposition[1] model, using the input data X and Y
 
         Parameters
@@ -72,6 +77,10 @@ class DMD:
             Whether to sort the discrete DMD eigenvalues by absolute
             value ("abs") or by their real part ("real")
             Default : "abs"
+        stock: bool, optional
+            Whteher to store the data snapshots in one of the object attributes;
+            dmd.data
+            Default False
 
         References
         ----------
@@ -113,6 +122,10 @@ class DMD:
 
         self.n_timesteps = X.shape[1]
         self.init = X[:, 0]
+
+        if stock:
+            self.stock = True
+            self.data = np.hstack((X, Y[:, -1].reshape((-1, 1))))
 
         if not no_reduc:
             # POD Decomposition of the X matrix
@@ -183,8 +196,11 @@ class DMD:
             Default : None
         method: int
             Method used to compute the initial mode amplitudes
-            0 if it is computed on the POD subspace as in Tu et al.[1]
-            1 if it is computed using the pseudoinverse of the DMD modes
+            0 if it is computed on the POD subspace as in Tu et al.[1] (Least Expensive)
+            1 if it is computed using the pseudoinverse of the DMD modes along
+                the initial snapshots
+            2 if it is computed as a least square fit for the DMD modes along
+                all snapshots (Most expensive)
             Default : 0
         stabilize : bool, optional
             DMD eigenvalue-shifting to stable eigenvalues at the prediction
@@ -206,7 +222,7 @@ class DMD:
                           "rank chosen/computed at the decomposition phase. Please see the rank value in self.kept_rank")
             rank = self._kept_rank
 
-        b = self._compute_amplitudes(t1, method)
+        b = self._compute_amplitudes(t1, method, rank=self.pred_rank)
 
         eig = self.eigenvalues[:rank]
         if stabilize:
@@ -248,19 +264,26 @@ class DMD:
                         * self.dt, self.n_timesteps)
         return self.predict(t, t1=self.t1)
 
-    def _compute_amplitudes(self, t1, method):
+    def _compute_amplitudes(self, t1, method, rank=None):
         self.t1 = t1
         if method == 1:
             init = self.init
             b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
             b /= np.exp(self.eigenvalues * t1)
         elif method == 2:
-            L = self.low_dim_eig[:self._ho_kept_rank, :] @ np.tile(np.eye(self.lambd.shape[0]), self.n_timesteps) * np.tile(self.lambd, self.n_timesteps)**np.repeat(
+            if self.data is None:
+                raise RuntimeError("The DMD Dcompositon wasnt called with the flag 'stock',"
+                                   "this method cant be used for prediction without storing data snapshots")
+            if rank is None:
+                rank = self._kept_rank
+            else:
+                rank = rank
+            L = self.low_dim_eig[:rank, :] @ np.tile(np.eye(self.lambd.shape[0]), self.n_timesteps) * np.tile(self.lambd, self.n_timesteps)**np.repeat(
                 np.linspace(1, self.n_timesteps, self.n_timesteps, dtype=int), self.lambd.shape[0])
-            L = np.vstack((self.low_dim_eig[:self._ho_kept_rank, :], L.reshape(
-                self._ho_kept_rank, -1, self.lambd.shape[0]).swapaxes(0, 1).reshape((-1, self.lambd.shape[0]))))
+            L = np.vstack((self.low_dim_eig[:rank, :], L.reshape(
+                rank, -1, self.lambd.shape[0]).swapaxes(0, 1).reshape((-1, self.lambd.shape[0]))))
             b, _, _, _ = np.linalg.lstsq(
-                L, (self.modes.T @ self.data).reshape((-1, 1), order='F').ravel(), rcond=None)
+                L, (self.pod_coeff).reshape((-1, 1), order='F').ravel(), rcond=None)
             b /= np.exp(self.eigenvalues * t1)
         else:
             alpha1 = self.singvals * self.time[:, 0]
@@ -277,3 +300,10 @@ class DMD:
         if self._A is None:
             self._A = self.modes @ self.A_tilde @ self.modes.T
         return self._A
+
+    @property
+    def pod_coeff(self):
+
+        if self._pod_coeff is None:
+            self._pod_coeff = self.modes.T @ self.data
+        return self._pod_coeff
