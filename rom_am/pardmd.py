@@ -76,6 +76,9 @@ class ParDMD:
 
         self.stacked_X = X.swapaxes(0, 2).swapaxes(
             0, 1).reshape((self._N, self._m*self._p), order='F')  # of size (N, m * p)
+        self.tikhonov = tikhonov
+        if self.tikhonov:
+            self.x_cond = np.linalg.cond(self.stacked_X)
 
         self.params = params
 
@@ -86,9 +89,11 @@ class ParDMD:
         u = self.pod_.modes
         vh = self.pod_.time
         s = self.pod_.singvals
+        if self.tikhonov:
+            s_ = (s**2 + self.tikhonov * self.x_cond) / s
         self._kept_rank = self.pod_.kept_rank
 
-        self.pod_coeff = np.diag(s) @ vh
+        self.pod_coeff = np.diag(s_) @ vh
 
         self.stacked_coeff = self.pod_coeff.swapaxes(0, 1).reshape(
             (self._p, self._m, self._kept_rank),).swapaxes(1, 2).reshape((-1, self._m))  # of size (n * p, m)
