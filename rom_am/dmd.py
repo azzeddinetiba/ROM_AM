@@ -215,6 +215,7 @@ class DMD:
         if self.dmd_modes is None:
             raise Exception("The DMD decomposition hasn't been executed yet")
 
+        self.t1 = t1
         if rank is None:
             rank = self._kept_rank
         elif not (isinstance(rank, int) and 0 < rank < self.kept_rank):
@@ -222,7 +223,7 @@ class DMD:
                           "rank chosen/computed at the decomposition phase. Please see the rank value in self.kept_rank")
             rank = self._kept_rank
 
-        b = self._compute_amplitudes(t1, method, rank=self.pred_rank)
+        b = self._compute_amplitudes(method, rank=self.pred_rank)
 
         eig = self.eigenvalues[:rank]
         if stabilize:
@@ -230,7 +231,7 @@ class DMD:
             eig_rmpl.real = 0
             eig[np.abs(self.lambd[:rank]) > 1] = eig_rmpl
 
-        return self.dmd_modes[:, :rank] @ (np.exp(np.outer(eig, t).T) * b[:rank]).T
+        return self.dmd_modes[:, :rank] @ (np.exp(np.outer(eig, t-t1).T) * b[:rank]).T
 
     def reconstruct(self, rank=None):
         """Reconstruct the data input using the DMD Model.
@@ -264,32 +265,29 @@ class DMD:
                         * self.dt, self.n_timesteps)
         return self.predict(t, t1=self.t1)
 
-    def _compute_amplitudes(self, t1, method, rank=None):
-        self.t1 = t1
+    def _compute_amplitudes(self, method, rank=None):
         if method == 1:
             init = self.init
             b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
-            b /= np.exp(self.eigenvalues * t1)
         elif method == 2:
-            if self.data is None:
-                raise RuntimeError("The DMD Dcompositon wasnt called with the flag 'stock',"
-                                   "this method cant be used for prediction without storing data snapshots")
             if rank is None:
                 rank = self._kept_rank
             else:
                 rank = rank
-            L = self.low_dim_eig[:rank, :] @ np.tile(np.eye(self.lambd.shape[0]), self.n_timesteps) * np.tile(self.lambd, self.n_timesteps)**np.repeat(
-                np.linspace(1, self.n_timesteps, self.n_timesteps, dtype=int), self.lambd.shape[0])
+            if self.data is None:
+                n_steps = self.n_timesteps - 1
+            else:
+                n_steps = self.n_timesteps
+            L = self.low_dim_eig[:rank, :] @ np.tile(np.eye(self.lambd.shape[0]), n_steps) * \
+                np.tile(self.lambd, n_steps)**np.repeat(
+                np.linspace(1, n_steps, n_steps, dtype=int), self.lambd.shape[0])
             L = np.vstack((self.low_dim_eig[:rank, :], L.reshape(
                 rank, -1, self.lambd.shape[0]).swapaxes(0, 1).reshape((-1, self.lambd.shape[0]))))
             b, _, _, _ = np.linalg.lstsq(
-                L, (self.pod_coeff).reshape((-1, 1), order='F').ravel(), rcond=None)
-            b /= np.exp(self.eigenvalues * t1)
+                L, (self.pod_coeff[:rank, :]).reshape((-1, 1), order='F').ravel(), rcond=None)
         else:
             alpha1 = self.singvals * self.time[:, 0]
-            b = np.linalg.solve(self.lambd * self.low_dim_eig, alpha1) / np.exp(
-                self.eigenvalues * t1
-            )
+            b = np.linalg.solve(self.lambd * self.low_dim_eig, alpha1)
         return b
 
     @property
@@ -305,5 +303,8 @@ class DMD:
     def pod_coeff(self):
 
         if self._pod_coeff is None:
-            self._pod_coeff = self.modes.T @ self.data
+            if self.data is not None:
+                self._pod_coeff = self.modes.T @ self.data
+            else:
+                self._pod_coeff = np.diag(self.singvals) @ self.time
         return self._pod_coeff

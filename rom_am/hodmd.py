@@ -38,7 +38,7 @@ class HODMD(DMD):
         16(2):882–925, 2017
 
         """
-        if hod < 0 or (not isinstance(rank, int) and not isinstance(rank, np.int64)):
+        if hod <= 0 or (not isinstance(rank, int) and not isinstance(rank, np.int64)):
             raise ValueError("Invalid 'hod' value, it should be an integer greater "
                              "than 0")
         if hod > X.shape[1]:
@@ -73,8 +73,8 @@ class HODMD(DMD):
         ho_X_ = np.empty((hod * new_X.shape[0], new_X.shape[1]+1-hod))
 
         for i in range(hod):
-            ho_X_[i*X.shape[0]:(i+1) * X.shape[0],
-                  :] = new_X[:X.shape[0], i:i+(new_X.shape[1]+1-hod)]
+            ho_X_[i*self._ho_kept_rank:(i+1) * self._ho_kept_rank,
+                  :] = new_X[:, i:i+(new_X.shape[1]+1-hod)]
 
         ho_X = ho_X_[:, :-1]
         ho_Y = ho_X_[:, 1::]
@@ -95,14 +95,19 @@ class HODMD(DMD):
         self.n_timesteps = X.shape[1]
         self.init = X[:, 0]
         self.phi = self.dmd_modes
-        self.dmd_modes = u @ self.low_dim_eig[:self._ho_kept_rank, :]
+        self.dmd_modes = u[:, :min(
+            self._ho_kept_rank, self._kept_rank)] @ self.low_dim_eig[:self._ho_kept_rank, :]
 
         return u, s, vh
 
     def predict(self, t, t1=0, rank=None, stabilize=False, method=2):
-        self.pred_rank = self._ho_kept_rank
-        # Only method = 2 for now
-        return super().predict(t=t, t1=t1, method=2, rank=rank, stabilize=stabilize)
+        self.pred_rank = min(self._ho_kept_rank, self._kept_rank)
+        # ==== Only method = 2 for now ====
+        if method != 2:
+            method = 2
+            warnings.warn(
+                "The method 2 is the only one suppported for HoDMD, It will be used here.")
+        return super().predict(t=t, t1=t1, method=method, rank=rank, stabilize=stabilize)
 
     @property
     def A(self):
