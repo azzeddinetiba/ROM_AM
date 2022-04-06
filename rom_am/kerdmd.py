@@ -2,7 +2,6 @@ import numpy as np
 from numpy import s_
 from .dmd import DMD
 from .pod import POD
-import warnings
 
 
 class KERDMD(DMD):

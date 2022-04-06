@@ -5,7 +5,6 @@ from .pod import POD
 from .dmd import DMD
 from .hodmd import HODMD
 from copy import deepcopy
-import warnings
 
 
 class ParDMD:
