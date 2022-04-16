@@ -11,7 +11,7 @@ ext_modules = [
     'ex4',
         ['example4.cpp'],
         # include_dirs=['pybind11/include', '/Users/azzeddinetiba/cpp_lib/eigen-3.4.0'],
-        include_dirs=['pybind11/include'],
+        include_dirs=['pybind11/include', '/usr/local/include/eigen-3.4.0'],
     language='c++',
     extra_compile_args = cpp_args,
     ),
