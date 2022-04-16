@@ -3,7 +3,8 @@ project(ex4 LANGUAGES CXX)
 
 #find_package (Eigen3 3.3 REQUIRED NO_MODULE)
 #include_directories( ${EIGEN3_INCLUDE_DIRS} )
-add_subdirectory(pybind11)
+#add_subdirectory(pybind11)
+find_package(pybind11 REQUIRED)
 #pybind11_add_module(example example.cpp)
 
 #Add source files
