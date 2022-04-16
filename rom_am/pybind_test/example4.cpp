@@ -16,6 +16,12 @@ namespace py = pybind11;
     return xs.determinant();
     }
 
+    double give()
+    {
+    double g = 90.2;
+    return g;
+    }
+
     // ----------------
     // Python interface
     // ----------------
@@ -23,11 +29,12 @@ namespace py = pybind11;
 
     PYBIND11_MODULE(ex4m,m)
     {
-    m.doc() = "pybind11 example plugin";
+    m.doc() = "pybind11 ex4m plugin";
 
     m.def("inv", &inv);
 
     m.def("det", &det);
+    m.def("g", &g);
     }
 
 int main() {
@@ -44,6 +51,7 @@ int main() {
     //py::module_ sys = py::module_::import("ex4");
     py::module_ np = py::module_::import("numpy");
     py::exec(R"(
+        import numpy
         input_ = numpy.array([0, 1, 2])
     )");
 
@@ -54,5 +62,9 @@ int main() {
 
     py::print("done2");
 
-
+    py::exec(R"(
+        import ex4m
+        res = ex4m.g()
+        print(res)
+    )");
 }
