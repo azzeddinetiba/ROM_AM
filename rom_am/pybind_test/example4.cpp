@@ -8,6 +8,5 @@ int main() {
     // Calculate e^π in decimal
     py::object Decimal = py::module_::import("decimal").attr("Decimal");
     py::object pi = Decimal("3.14159");
-    py::object exp_pi = pi.attr("exp")();
-    py::print(py::str(exp_pi));
+    py::print(pi);
 }
