@@ -11,4 +11,8 @@ int main() {
     py::object Decimal = py::module_::import("decimal").attr("Decimal");
     py::object pi = Decimal("3.14159");
     py::print(pi);
+
+    py::object rom_am = py::module_::import("rom_am");
+    py::object dmd = py::module_::import("rom_am").attr("DMD")();
+
 }
