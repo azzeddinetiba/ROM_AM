@@ -43,6 +43,14 @@ int main() {
     py::print("done1");
     //py::module_ sys = py::module_::import("ex4");
     py::module_ np = py::module_::import("numpy");
+    py::exec(R"(
+        input_ = numpy.array([0, 1, 2])
+    )");
+
+    py::exec(R"(
+        input_ = 2*input_
+        print(input_)
+    )");
 
     py::print("done2");
 
