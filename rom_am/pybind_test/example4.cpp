@@ -71,5 +71,5 @@ int main() {
         print(res)
     )", py::globals(), locals);
 
-    std::cout<<locals["res"];
+    std::cout<<locals["res"].cast<double>();
 }
