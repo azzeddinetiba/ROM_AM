@@ -77,5 +77,5 @@ int main() {
         print(res)
     )", py::globals(), locals);
 
-    cout<<locals["res"];
+    std::cout<<locals["res"];
 }
