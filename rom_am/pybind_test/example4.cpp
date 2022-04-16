@@ -21,7 +21,7 @@ namespace py = pybind11;
     // ----------------
 
 
-    PYBIND11_MODULE(ex4,m)
+    PYBIND11_MODULE(ex4m,m)
     {
     m.doc() = "pybind11 example plugin";
 
