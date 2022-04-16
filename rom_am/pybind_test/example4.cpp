@@ -5,14 +5,7 @@
 #include <Eigen/LU>
 
 namespace py = pybind11;
-
-class testing
-{
-    public:
-        Eigen::MatrixXd testiw;
-        void grab(const Eigen::MatrixXd &xs);
-
-}
+using namespace py::literals;
 
     Eigen::MatrixXd inv(const Eigen::MatrixXd &xs)
     {
@@ -71,6 +64,7 @@ int main() {
 
     py::print("done2");
 
+    auto locals = py::dict();
     py::exec(R"(
         import ex4m
         res = ex4m.g()
