@@ -67,9 +67,12 @@ int main() {
     auto locals = py::dict();
     py::exec(R"(
         import ex4m
+        import numpy
         res = ex4m.g()
         print(res)
+        res2 = numpy.array([1, 2, 3])
     )", py::globals(), locals);
 
     std::cout<<locals["res"].cast<double>();
+    std::cout<<locals["res2"].cast<Eigen::MatrixXd>();
 }
