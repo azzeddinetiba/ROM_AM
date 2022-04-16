@@ -6,6 +6,14 @@
 
 namespace py = pybind11;
 
+class testing
+{
+    public:
+        Eigen::MatrixXd testiw;
+        void grab(const Eigen::MatrixXd &xs);
+
+}
+
     Eigen::MatrixXd inv(const Eigen::MatrixXd &xs)
     {
     return xs.inverse();
@@ -34,7 +42,7 @@ namespace py = pybind11;
     m.def("inv", &inv);
 
     m.def("det", &det);
-    
+
     m.def("g", &give);
     }
 
@@ -67,5 +75,7 @@ int main() {
         import ex4m
         res = ex4m.g()
         print(res)
-    )");
+    )", py::globals(), locals);
+
+    cout<<locals["res"];
 }
