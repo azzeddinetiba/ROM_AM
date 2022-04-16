@@ -34,7 +34,8 @@ namespace py = pybind11;
     m.def("inv", &inv);
 
     m.def("det", &det);
-    m.def("g", &g);
+    
+    m.def("g", &give);
     }
 
 int main() {
