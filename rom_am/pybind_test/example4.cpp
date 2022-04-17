@@ -89,8 +89,8 @@ int main() {
         bb.decompose(X = np.random.randn(12, 4), Y = np.random.randn(12, 4), dt = 0.4)
     )", py::globals(), locals);
 
-    py::object res_dmd = locals["bb"];
-    py::object res_dmd_2 = np.attr("singvals");
+    py::object res_dmd = locals["ll"];
+    py::object res_dmd_2 = res_dmd.attr("singvals");
 
     std::cout<<"YOO \n";
     std::cout<<res_dmd_2.cast<Eigen::VectorXd>();
