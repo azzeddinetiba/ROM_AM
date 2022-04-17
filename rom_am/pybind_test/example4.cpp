@@ -79,6 +79,15 @@ int main() {
     py::module_ np = py::module_::import("numpy");
     py::object result2 = np.attr("exp")(result);
 
+    std::cout<<"\n tst1 \n";
+    Eigen::MatrixXf interm(2, 2);
+	interm(0, 0) = -1;
+	interm(0, 1) = -1;
+	interm(1, 0) = 1;
+	interm(1, 1) = 1;
+    py::object result3 = np.attr("exp")(interm);
+    std::cout<<"\n tst2 \n";
+
     std::cout<<result2.cast<Eigen::MatrixXd>();
 
     py::exec(R"(
