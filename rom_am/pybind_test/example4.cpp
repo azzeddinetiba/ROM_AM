@@ -81,5 +81,18 @@ int main() {
 
     std::cout<<result2.cast<Eigen::MatrixXd>();
 
+    py::exec(R"(
+        import rom_am
+        import numpy as np
+        ll = rom_am.DMD()
+        bb = rom_am.ROM(ll)
+        bb.decompose(X = np.random.randn(12, 4), Y = np.random.randn(12, 4), dt = 0.4)
+    )", py::globals(), locals);
+
+    py::object res_dmd = locals["bb"];
+    py::object res_dmd_2 = np.attr("singvals");
+
+    std::cout<<"YOO \n";
+    std::cout<<res_dmd_2.cast<Eigen::VectorXd>();
 
 }
