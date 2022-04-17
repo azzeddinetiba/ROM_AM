@@ -76,8 +76,11 @@ int main() {
     std::cout<<locals["res"].cast<double>();
     std::cout<<locals["res2"].cast<Eigen::MatrixXd>();
 
-        py::exec(R"(
-        print(res)
-    )");
+    py::object result = locals["res2"];
+    py::module_ np = py::module_::import("numpy");
+    py::object result2 = np.attr("exp")(result);
+
+    std::cout<<result2.cast<Eigen::MatrixXd>();
+
 
 }
