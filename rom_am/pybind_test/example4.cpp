@@ -75,4 +75,9 @@ int main() {
 
     std::cout<<locals["res"].cast<double>();
     std::cout<<locals["res2"].cast<Eigen::MatrixXd>();
+
+        py::exec(R"(
+        print(res)
+    )");
+
 }
