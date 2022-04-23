@@ -63,6 +63,16 @@ class POD:
 
 
         """
+        min_dim = min(X.shape[0], X.shape[1])
+        if rank < 0 or (rank > 1 and not isinstance(rank, int) and
+                        not isinstance(rank, np.int64) and
+                        not isinstance(rank, np.int32)):
+            raise ValueError("Invalid rank value, it should be an integer greater "
+                             "than 0 or a float between 0 and 1")
+        if rank > min_dim:
+            warnings.warn("The rank chosen for reconstruction should not be greater than "
+                          "the smallest data dimension m, the rank is now chosen as m")
+            rank = min_dim
 
         if alg == "svd":
             if os_ == 0:
@@ -72,10 +82,6 @@ class POD:
                 vh = np.array(vh)
             else:
                 u, s, vh = sp.svd(X, False)
-
-            if rank > X.shape[1]:
-                warnings.warn("The rank chosen for reconstruction should not be greater than\
-                the number of snapshots 'm', the rank is now chosen as m")
 
             if opt_trunc:
                 if X.shape[0] <= X.shape[1]:
@@ -104,16 +110,28 @@ class POD:
             lambd = np.flip(lambd)
             v = np.flip(v, 1)
             lambd[lambd < 1e-10] = 0
+            s = np.sqrt(lambd)
 
-            if rank == 0:
-                rank = len(lambd[lambd > 1e-10])
+            if opt_trunc:
+                if X.shape[0] <= X.shape[1]:
+                    beta = X.shape[0]/X.shape[1]
+                else:
+                    beta = X.shape[1]/X.shape[0]
+                omega = 0.56 * beta**3 - 0.95 * beta**2 + 1.82 * beta + 1.43
+                tau = np.median(s) * omega
+                rank = np.sum(s > tau)
+            else:
+                if rank == 0:
+                    rank = len(lambd[lambd > 1e-10])
+                elif 0 < rank < 1:
+                    rank = np.searchsorted(
+                        np.cumsum(s**2 / (s**2).sum()), rank) + 1
 
-            v = v[:, :rank]
-            vh = v.T
-
-            s = np.sqrt(lambd[:rank])
+            s = s[:rank]
             s_inv = np.zeros(s.shape)
             s_inv[s > 1e-10] = 1.0 / s[s > 1e-10]
+            v = v[:, :rank]
+            vh = v.T
 
             u = X @ v[:, :rank] * s_inv
 
@@ -147,8 +165,8 @@ class POD:
         if rank is None:
             rank = self.kept_rank
         elif not (isinstance(rank, int) and 0 < rank < self.kept_rank):
-            warnings.warn('The rank chosen for reconstruction should be an integer smaller than the\
-            rank chosen/computed at the decomposition phase. Please see the rank value by self.kept_rank')
+            warnings.warn("The rank chosen for reconstruction should be an integer smaller than the "
+                          "rank chosen/computed at the decomposition phase. Please see the rank value by self.kept_rank")
             rank = self.kept_rank
 
         return (self.modes[:, :rank] * self.singvals[:rank]) @ self.time[:rank, :]

@@ -16,8 +16,8 @@ class ROM:
         reconstruct() and predict()
 
         The class' decompose() method must take as arguments at least
-        the same arguments of ROM.decompose(), same thing for
-        ROM.reconstruct() and ROM.predict()
+        the {X, alg, rank, opt_trunc, tikhonov} arguments, the predict()
+        has to take at least {t, t1, rank} and {rank} for reconstruct
 
     """
 
@@ -34,6 +34,7 @@ class ROM:
         self.norm_info = None
         self.Y = None
         self.Y_input = None
+        self._accuracy = None
 
     def decompose(
             self,
@@ -165,10 +166,10 @@ class ROM:
         """
         t0 = time.time()
         res = self.model.predict(t=t, t1=t1, rank=rank, *args, **kwargs)
-        if self.center:
-            res = self._decenter(res)
         if self.normalize:
             res = self._denormalize(res)
+        if self.center:
+            res = self._decenter(res)
         t1 = time.time()
         self.profile["Prediction time"] = t1-t0
         return res
@@ -179,7 +180,7 @@ class ROM:
         Parameters
         ----------
         rank: int or None
-            ranks kept for prediction: it should be a hard threshold integer
+            ranks kept for reconstruction: it should be a hard threshold integer
             and greater than the rank chose/computed in the decomposition
             phase. If None, the same rank already computed is used
             Default : None 
@@ -299,3 +300,58 @@ class ROM:
             the decentered data based on the mean of the input snapshots
         """
         return res + self.mean_flow.reshape((-1, 1))
+
+    def reconstruct(self, rank=None):
+        return self.model.reconstruct(rank)
+
+    @property
+    def accuracy(self,):
+        return self.get_accuracy()
+
+    def get_accuracy(self, rank=None, t=None, ref=None, t1=0):
+        """Gives the accuracy of the ROM, in terms of an L2 norm of the error
+        compared to the input data or to reference values
+
+        Parameters
+        ----------
+        rank: int
+            ranks kept for prediction/reconstruction: it should be a hard
+            threshold integer and greater than the rank chose/computed in
+            the decomposition phase. If None, the same rank already computed
+            is used
+            Default : None
+        t: ndarray (m, )
+            The time instants of the ROM solution to be compared to the
+            reference
+            in case it is not assigned, the accuracy is copmputed for
+            reconstruction (compared to the input snapshots)
+        ref: ndarray (N, m)
+            The reference solution to which the ROM solution is compared,
+            in case it is not assigned, the accuracy is copmputed for
+            reconstruction (compared to the input snapshots)
+            has the same axis 1 dimension as the axis 0 in the 't' argument
+        t1: float
+            the value of the time instant of the first snapshot
+
+        Returns
+        ----------
+            float
+            the relative error of the ROM
+        """
+        if self.Y is None:
+            self._trained_on = self.snapshots
+        else:
+            self._trained_on = self.Y
+        if t is None:
+            if self._accuracy is None:
+                try:
+                    self._accuracy = self.model.accuracy
+                except AttributeError:
+                    err = np.linalg.norm(self.reconstruct(
+                        rank=rank) - self._trained_on, axis=0)/np.linalg.norm(self._trained_on, axis=0)
+                    self._accuracy = err.sum()/err.shape[0]
+            return self._accuracy
+        else:
+            err = np.linalg.norm(self.predict(
+                t=t, rank=rank, t1=t1) - ref, axis=0)/np.linalg.norm(ref, axis=0)
+            return err.sum()/err.shape[0]

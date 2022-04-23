@@ -24,6 +24,11 @@ class DMD:
         self.init = None
         self.A_tilde = None
         self._A = None
+        self._no_reduction = False
+        self.pred_rank = None
+        self._pod_coeff = None
+        self.stock = False
+        self.data = None
 
     def decompose(self,
                   X,
@@ -33,7 +38,9 @@ class DMD:
                   tikhonov=0,
                   sorting="abs",
                   Y=None,
-                  dt=None,):
+                  dt=None,
+                  no_reduc=False,
+                  stock=False):
         """Training the dynamic mode decomposition[1] model, using the input data X and Y
 
         Parameters
@@ -70,6 +77,10 @@ class DMD:
             Whether to sort the discrete DMD eigenvalues by absolute
             value ("abs") or by their real part ("real")
             Default : "abs"
+        stock: bool, optional
+            Whteher to store the data snapshots in one of the object attributes;
+            dmd.data
+            Default False
 
         References
         ----------
@@ -97,6 +108,13 @@ class DMD:
 
 
         """
+        if X.shape[0] != Y.shape[0]:
+            raise Exception("The DMD input snapshots X and Y have to have \
+                the same observables, for different observables in X and Y, \
+                    Please consider using the EDMD() class")
+        if X.shape[1] != Y.shape[1]:
+            raise Exception("The DMD input snapshots X and Y have to have \
+                the same number of instants")
 
         self.tikhonov = tikhonov
         if self.tikhonov:
@@ -105,37 +123,50 @@ class DMD:
         self.n_timesteps = X.shape[1]
         self.init = X[:, 0]
 
-        # POD Decomposition of the X matrix
-        self.pod_ = POD()
-        self.pod_.decompose(X, alg=alg, rank=rank,
-                            opt_trunc=opt_trunc)
-        u = self.pod_.modes
-        vh = self.pod_.time
-        s = self.pod_.singvals
-        self._kept_rank = self.pod_.kept_rank
+        if stock:
+            self.stock = True
+            self.data = np.hstack((X, Y[:, -1].reshape((-1, 1))))
 
-        # Computing the A_tilde: the projection of the 'A' operator
-        # on the POD modes, where A = Y * pseudoinverse(X) [1]
-        s_inv = np.zeros(s.shape)
-        s_inv = 1 / s
-        s_inv_ = s_inv.copy()
-        if self.tikhonov:
-            s_inv_ *= s**2 / (s**2 + self.tikhonov * self.x_cond)
-        store = np.linalg.multi_dot((Y, vh.T, np.diag(s_inv_)))
-        self.A_tilde = u.T @ store
+        if not no_reduc:
+            # POD Decomposition of the X matrix
+            self.pod_ = POD()
+            self.pod_.decompose(X, alg=alg, rank=rank,
+                                opt_trunc=opt_trunc)
+            u = self.pod_.modes
+            vh = self.pod_.time
+            s = self.pod_.singvals
+            self._kept_rank = self.pod_.kept_rank
 
-        # Eigendecomposition on the low dimensional operator
-        lambd, w = np.linalg.eig(self.A_tilde)
-        if sorting == "abs":
-            idx = (np.abs(lambd)).argsort()[::-1]
-        else:
-            idx = (np.real(lambd)).argsort()[::-1]
-        lambd = lambd[idx]
-        w = w[:, idx]
-        self.low_dim_eig = w
+            # Computing the A_tilde: the projection of the 'A' operator
+            # on the POD modes, where A = Y * pseudoinverse(X) [1]
+            s_inv = np.zeros(s.shape)
+            s_inv = 1 / s
+            if self.tikhonov:
+                s_inv *= s**2 / (s**2 + self.tikhonov * self.x_cond)
+            store = np.linalg.multi_dot((Y, vh.T, np.diag(s_inv)))
+            self.A_tilde = u.T @ store
 
-        # Computing the high-dimensional DMD modes [1]
-        phi = store @ w
+            # Eigendecomposition on the low dimensional operator
+            lambd, w = np.linalg.eig(self.A_tilde)
+            if sorting == "abs":
+                idx = (np.abs(lambd)).argsort()[::-1]
+            else:
+                idx = (np.real(lambd)).argsort()[::-1]
+            lambd = lambd[idx]
+            w = w[:, idx]
+            self.low_dim_eig = w
+
+            # Computing the high-dimensional DMD modes [1]
+            phi = store @ w
+        else:  # Should ONLY be used in the context of parametric DMD
+            self._no_reduction = True
+            self._A = Y @ np.linalg.pinv(X)
+            lambd, phi = np.linalg.eig(self._A)
+
+            s = 0.
+            u = 0.
+            vh = 0.
+
         omega = np.log(lambd) / dt  # Continuous system eigenvalues
 
         # Loading the DMD instance's attributes
@@ -149,7 +180,7 @@ class DMD:
 
         return u, s, vh
 
-    def predict(self, t, t1=0, method=0, rank=None, stabilize=False):
+    def predict(self, t, t1=0, method=0, rank=None, stabilize=True):
         """Predict the DMD solution on the prescribed time instants.
 
         Parameters
@@ -165,30 +196,34 @@ class DMD:
             Default : None
         method: int
             Method used to compute the initial mode amplitudes
-            0 if it is computed on the POD subspace as in Tu et al.[1]
-            1 if it is computed using the pseudoinverse of the DMD modes
+            0 if it is computed on the POD subspace as in Tu et al.[1] (Least Expensive)
+            1 if it is computed using the pseudoinverse of the DMD modes along
+                the initial snapshots
+            2 if it is computed as a least square fit for the DMD modes along
+                all snapshots (Most expensive)
             Default : 0
         stabilize : bool, optional
             DMD eigenvalue-shifting to stable eigenvalues at the prediction
             phase
-            Default : False
+            Default : True
 
         Returns
         ----------
             numpy.ndarray, size (N, nt)
-            ROM solution on the time values t
+            DMD solution on the time values t
         """
         if self.dmd_modes is None:
             raise Exception("The DMD decomposition hasn't been executed yet")
 
+        self.t1 = t1
         if rank is None:
             rank = self._kept_rank
         elif not (isinstance(rank, int) and 0 < rank < self.kept_rank):
-            warnings.warn('The rank chosen for prediction should be an integer smaller than the\
-            rank chosen/computed at the decomposition phase. Please see the rank value in self.kept_rank')
+            warnings.warn("The rank chosen for prediction should be an integer smaller than the "
+                          "rank chosen/computed at the decomposition phase. Please see the rank value in self.kept_rank")
             rank = self._kept_rank
 
-        b = self._compute_amplitudes(t1, method)
+        b = self._compute_amplitudes(method, rank=self.pred_rank)
 
         eig = self.eigenvalues[:rank]
         if stabilize:
@@ -196,7 +231,7 @@ class DMD:
             eig_rmpl.real = 0
             eig[np.abs(self.lambd[:rank]) > 1] = eig_rmpl
 
-        return self.dmd_modes[:, :rank] @ (np.exp(np.outer(eig, t).T) * b[:rank]).T
+        return self.dmd_modes[:, :rank] @ (np.exp(np.outer(eig, t-t1).T) * b[:rank]).T
 
     def reconstruct(self, rank=None):
         """Reconstruct the data input using the DMD Model.
@@ -217,38 +252,59 @@ class DMD:
         if rank is None:
             rank = self._kept_rank
         elif not (isinstance(rank, int) and 0 < rank < self.kept_rank):
-            warnings.warn('The rank chosen for reconstruction should be an integer smaller than the\
-            rank chosen/computed at the decomposition phase. Please see the rank value in self.kept_rank')
+            warnings.warn("The rank chosen for reconstruction should be an integer smaller than the "
+                          "rank chosen/computed at the decomposition phase. Please see the rank value in self.kept_rank")
             rank = self._kept_rank
 
         if self.t1 is None:
             self.t1 = 0
-            warnings.warn('the initial instant value was not assigned during the prediction phase,\
-                t1 is chosen as 0')
+            warnings.warn("the initial instant value was not assigned during the prediction phase, "
+                          "t1 is chosen as 0")
 
-        t = np.linspace(self.t1, self.t1 + (self.n_timesteps - 1)
+        t = np.linspace(self.t1 + self.dt, self.t1 + self.n_timesteps
                         * self.dt, self.n_timesteps)
-        y0 = self.init.reshape((-1, 1))
-        return np.hstack((y0, self.predict(t, t1=self.t1)))
+        return self.predict(t, t1=self.t1)
 
-    def _compute_amplitudes(self, t1, method):
-        self.t1 = t1
-        if method:
+    def _compute_amplitudes(self, method, rank=None):
+        if method == 1:
             init = self.init
             b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
-            b /= np.exp(self.eigenvalues * t1)
+        elif method == 2:
+            if rank is None:
+                rank = self._kept_rank
+            else:
+                rank = rank
+            if self.data is None:
+                n_steps = self.n_timesteps - 1
+            else:
+                n_steps = self.n_timesteps
+            L = self.low_dim_eig[:rank, :] @ np.tile(np.eye(self.lambd.shape[0]), n_steps) * \
+                np.tile(self.lambd, n_steps)**np.repeat(
+                np.linspace(1, n_steps, n_steps, dtype=int), self.lambd.shape[0])
+            L = np.vstack((self.low_dim_eig[:rank, :], L.reshape(
+                rank, -1, self.lambd.shape[0]).swapaxes(0, 1).reshape((-1, self.lambd.shape[0]))))
+            b, _, _, _ = np.linalg.lstsq(
+                L, (self.pod_coeff[:rank, :]).reshape((-1, 1), order='F').ravel(), rcond=None)
         else:
             alpha1 = self.singvals * self.time[:, 0]
-            b = np.linalg.solve(self.lambd * self.low_dim_eig, alpha1) / np.exp(
-                self.eigenvalues * t1
-            )
+            b = np.linalg.solve(self.lambd * self.low_dim_eig, alpha1)
         return b
 
     @property
     def A(self):
-        """Compute the high dimensional DMD operator.
+        """Computes the high dimensional DMD operator.
 
         """
         if self._A is None:
             self._A = self.modes @ self.A_tilde @ self.modes.T
         return self._A
+
+    @property
+    def pod_coeff(self):
+
+        if self._pod_coeff is None:
+            if self.data is not None:
+                self._pod_coeff = self.modes.T @ self.data
+            else:
+                self._pod_coeff = np.diag(self.singvals) @ self.time
+        return self._pod_coeff

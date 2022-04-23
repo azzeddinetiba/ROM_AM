@@ -118,6 +118,11 @@ DATA/*/*.txt
 DATA/*.mat
 DATA/*/*.mat
 !DATA/.gitkeep 
+DATA/*/*.csv
+DATA/*/*.h3d
+DATA/*/*.oml
+DATA/Parametric/*/*.npy
+DATA/Parametric/*/*.txt
 DATA/*/*/*.csv
 DATA/*/*/**.h3d
 DATA/*/*/*.oml
