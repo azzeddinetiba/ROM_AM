@@ -261,7 +261,7 @@ class DMD:
             warnings.warn("the initial instant value was not assigned during the prediction phase, "
                           "t1 is chosen as 0")
 
-        t = np.linspace(self.t1 + self.dt, self.t1 + (self.n_timesteps - 1)
+        t = np.linspace(self.t1 + self.dt, self.t1 + self.n_timesteps
                         * self.dt, self.n_timesteps)
         return self.predict(t, t1=self.t1)
 
