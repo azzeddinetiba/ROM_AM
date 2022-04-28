@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC  -flto -shared  -o ex4m.cpython-38-x86_64-linux-gnu.so CMakeFiles/ex4m.dir/example4.cpp.o 

@@ -1,0 +1,1 @@
+/usr/bin/c++    -rdynamic CMakeFiles/ex4.dir/example4.cpp.o  -o ex4  -lpython3.8 
