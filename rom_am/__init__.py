@@ -7,3 +7,4 @@ from .hodmd import HODMD
 from .kerdmd import KERDMD
 from .parrom import ParROM
 from .pardmd import ParDMD
+from .kerdmdc import KERDMDC
