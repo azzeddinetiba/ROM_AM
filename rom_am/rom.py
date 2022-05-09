@@ -164,13 +164,17 @@ class ROM:
             numpy.ndarray, size (N, nt)
             ROM solution on the time values t
         """
+        try:
+            kwargs["u_input"] = kwargs["u_input"]/self.snap_norms[-1]
+        except AttributeError:
+            pass
         t0 = time.time()
         res = self.model.predict(t=t, t1=t1, rank=rank, *args, **kwargs)
+        t1 = time.time()
         if self.normalize:
             res = self._denormalize(res)
         if self.center:
             res = self._decenter(res)
-        t1 = time.time()
         self.profile["Prediction time"] = t1-t0
         return res
 

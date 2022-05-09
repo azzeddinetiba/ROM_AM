@@ -1,4 +1,5 @@
 import numpy as np
+from .pod import POD
 import warnings
 
 
@@ -12,8 +13,9 @@ class KERDMDC:
         if kernel is None:
             kernel = self.kernel
         if kernel == "poly":
-            XTY = (1 + X.T @ Y)**p
-            XTX = (1 + X.T @ X)**p
+            self.kernel = lambda x, y: (1 + x.T @ y)**p
+            XTY = self.kernel(X, Y)
+            XTX = self.kernel(X, X)
         elif kernel == "sigmoid":
             XTY = np.tanh(X.T @ Y + a)
             XTX = np.tanh(X.T @ X + a)
@@ -46,6 +48,9 @@ class KERDMDC:
         self._pod_coeff = None
         self.stock = False
         self.data = None
+        self._koop_eigv = None
+        self._koop_mode = None
+        self._koop_eifg_coeff = None
 
     def decompose(self, X,
                   alg="snap",
@@ -68,108 +73,137 @@ class KERDMDC:
 
         """
         self.n_timesteps = X.shape[1]
+        self.nx = X.shape[0]
         self.data_X = X
         self.init = X[:, 0]
         self.inputfun = inputfun
         self.sorting = sorting
         self.kernel = kernel
 
-        # Computing X.T @ Y/X using chosen kernels
-        XTY, XTX = self.kerfun(X, Y, kernel, p, a, sig)
+        Xin = np.vstack((X, Y_input))
+        Yout = Y.copy()
+        self.Yout = Yout
+        self.Xin = Xin
 
-        xi_u_inv = np.diag(inputfun(1/(Y_input.ravel())))
+        # Computing X.T @ Y/X using chosen kernels
+        _, XoTXo = self.kerfun(Yout, Yout, kernel, p, a, sig)
+        _, XiTXi = self.kerfun(Xin, Xin, kernel, p, a, sig)
 
         # Eigendecomposition of X.T @ Y to compute singular values and time coefficients
-        vals, v = np.linalg.eigh(XTX)
+        valso, vo = np.linalg.eigh(XoTXo)
+        valso = np.flip(valso)
+        vo = np.flip(vo, 1)
+        valso[valso < 1e-10] = 0
+        so = np.sqrt(valso)
 
-        vals = np.flip(vals)
-        v = np.flip(v, 1)
-        vals[vals < 1e-10] = 0
-        s = np.sqrt(vals)
+        if rank == 0:
+            rank = len(valso[valso > 1e-10])
+        elif 0 < rank < 1:
+            rank = np.searchsorted(
+                np.cumsum(so**2 / (so**2).sum()), rank) + 1
 
-        if opt_trunc:
-            if X.shape[0] <= X.shape[1]:
-                beta = X.shape[0]/X.shape[1]
-            else:
-                beta = X.shape[1]/X.shape[0]
-            omega = 0.56 * beta**3 - 0.95 * beta**2 + 1.82 * beta + 1.43
-            tau = np.median(s) * omega
-            rank = np.sum(s > tau)
-        else:
-            if rank == 0:
-                rank = len(vals[vals > 1e-10])
-            elif 0 < rank < 1:
-                rank = np.searchsorted(
-                    np.cumsum(s**2 / (s**2).sum()), rank) + 1
-
-        s = s[:rank]
-        s_inv = np.zeros(s.shape)
-        s_inv[s > 1e-10] = 1.0 / s[s > 1e-10]
+        so = so[:rank]
+        s_invo = np.zeros(so.shape)
+        s_invo[so > 1e-10] = 1.0 / so[so > 1e-10]
         self.tikhonov = tikhonov
         if self.tikhonov:
             self.x_cond = np.linalg.cond(X)
         if self.tikhonov:
-            s_inv *= s**2 / (s**2 + self.tikhonov * self.x_cond)
+            s_invo *= so**2 / (so**2 + self.tikhonov * self.x_cond)
 
-        v = v[:, :rank]
-        vh = v.T
+        vo = vo[:, :rank]
+        vho = vo.T
+
+        # Eigendecomposition of X.T @ Y to compute singular values and time coefficients
+        valsi, vi = np.linalg.eigh(XiTXi)
+
+        valsi = np.flip(valsi)
+        vi = np.flip(vi, 1)
+        valsi[valsi < 1e-10] = 0
+        si = np.sqrt(valsi)
+
+        if rank == 0:
+            rank = len(valsi[valsi > 1e-10])
+        elif 0 < rank < 1:
+            rank = np.searchsorted(
+                np.cumsum(si**2 / (si**2).sum()), rank) + 1
+
+        si = si[:rank]
+        s_invi = np.zeros(si.shape)
+        s_invi[si > 1e-10] = 1.0 / si[si > 1e-10]
+        self.tikhonov = tikhonov
+        if self.tikhonov:
+            self.x_cond = np.linalg.cond(X)
+        if self.tikhonov:
+            s_invi *= si**2 / (si**2 + self.tikhonov * self.x_cond)
+
+        vi = vi[:, :rank]
+        vhi = vi.T
 
         # Compute K^
-        self._A_chap = np.linalg.multi_dot(
-            (np.diag(s_inv), vh, XTY, xi_u_inv, vh.T, np.diag(s_inv)))
+        self._A = np.linalg.multi_dot((np.diag(so), vho, vi, np.diag(s_invi)))
+
+        svdA = POD()
+        q_tilde, sig_, v_tilde = svdA.decompose(self._A, rank=rank, tikhonov = tikhonov)
 
         # Loading the DMD instance's attributes
+        self.lambd = sig_
         self.dt = dt
-        self.singvals = s
-        self.inv_singv = s_inv
-        self.time = vh
-        self.modes = None
+        self.singvals = so
+        self.inv_singv = s_invo
+        self.s_invi = s_invi
+        self.vi = vi
+        self.time = vho
+        self.modes = q_tilde
+        self.rgt_modes = v_tilde.T
 
-        return 0, s, vh
+        return q_tilde, so, vho
 
-    def A(self, u):
-        """Computes the high dimensional DMD operator.
+    @property
+    def koop_eigv(self):
+        """Returns the koopman eigenvalues.
 
         """
-        return self._A_chap * self.inputfun(u)
+        if self._koop_eigv is None:
+            self._koop_eigv = self.lambd
+        return self._koop_eigv
 
-    def koopman(self, u):
+    @property
+    def koop_mode(self):
+        """Returns the koopman modes.
 
-        A = self.A(u)
+        """
+        if self._koop_mode is None:
+            self._koop_mode = np.linalg.multi_dot(
+                (self.Yout, self.time.T, np.diag(self.inv_singv), self.modes))
+        return self._koop_mode
 
-        lambd, w = np.linalg.eig(A)
-        _, ksi = np.linalg.eig(A.T)
+    @property
+    def koop_eifg_coeff(self):
+        """Returns the koopman modes.
 
-        sorting = self.sorting
-        if sorting == "abs":
-            idx = (np.abs(lambd)).argsort()[::-1]
-        else:
-            idx = (np.real(lambd)).argsort()[::-1]
-        lambd = lambd[idx]
-        w = w[:, idx]
-        ksi = ksi[:, idx]
-        low_dim_eig = w
+        """
+        if self._koop_eifg_coeff is None:
+            self._koop_eifg_coeff = np.linalg.multi_dot(
+                (self.vi, np.diag(self.s_invi), self.rgt_modes))
+        return self._koop_eifg_coeff
 
-        modes = np.linalg.multi_dot(
-            (self.data_X, self.time.T, np.diag(self.inv_singv), low_dim_eig))
-        eigfuncoef = self.time.T @ np.diag(self.inv_singv) @ ksi
+    def koop_eigf(self, x):
+        f = self.kernel(x, self.Xin)
+        return (f @ self.koop_eifg_coeff).T
 
-        return lambd, modes, eigfuncoef
-
-    def predict(self, u_input):
+    def predict(self, t, t1=0, rank=None, u_input=None):
         """Predict the DMD solution on the prescribed time instants.
 
         """
 
         t_size = u_input.shape[1]
-        pred = np.empty((self.data_X.shape[0], t_size+1), dtype=complex)
+        pred = np.empty((self.nx, t_size+1), dtype=complex)
         pred[:, 0] = self.init
-
+        store = self.koop_mode[:self.nx, :] @ np.diag(self.koop_eigv)
         for i in range(t_size):
-            lambd, modes, eigfuncoef = self.koopman(u_input[:, i])
-            xty, _ = self.kerfun(pred[:, i].reshape((-1, 1)),
-                                 self.data_X)
-            b = xty @ eigfuncoef
-            pred[:, i+1] = (modes @ np.diag(lambd) @ b.T).ravel()
+            xin = np.vstack((pred[:, i].reshape((-1, 1)),
+                            u_input[:, i].reshape((-1, 1))))
+            pred[:, i+1] = (store @ self.koop_eigf(xin)).ravel()
 
         return pred
