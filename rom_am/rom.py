@@ -108,6 +108,7 @@ class ROM:
         """
 
         self.snapshots = X.copy()
+        self.nx = X.shape[0]
         if "Y" in kwargs.keys():
             self.Y = kwargs["Y"].copy()
             if "Y_input" in kwargs.keys():
@@ -166,7 +167,8 @@ class ROM:
         """
         try:
             try:
-                kwargs["u_input"] = kwargs["u_input"]/self.snap_norms[-1]
+                kwargs["u_input"] = kwargs["u_input"] / \
+                    self.snap_norms[self.nx::, np.newaxis]
             except KeyError:
                 pass
         except AttributeError:
@@ -235,10 +237,10 @@ class ROM:
                 self.snap_norms, 0), 1, self.snap_norms)
             if self.Y_input is not None:
                 self.Y_input = self.Y_input / \
-                    self.snap_norms[-1, np.newaxis]
-                self.Y = self.Y / self.snap_norms[:-1, np.newaxis]
+                    self.snap_norms[self.nx::, np.newaxis]
+                self.Y = self.Y / self.snap_norms[:self.nx, np.newaxis]
                 self.snapshots = self.snapshots / \
-                    self.snap_norms[:-1, np.newaxis]
+                    self.snap_norms[:self.nx, np.newaxis]
             else:
                 self.snapshots = self.snapshots / \
                     self.snap_norms[:, np.newaxis]
@@ -274,7 +276,7 @@ class ROM:
             return res * self.max_min + self.snap_min[:, np.newaxis]
         elif self.normalization == "norm":
             if self.Y_input is not None:
-                return res * self.snap_norms[:-1, np.newaxis]
+                return res * self.snap_norms[:self.nx, np.newaxis]
             else:
                 return res * self.snap_norms[:, np.newaxis]
         elif self.normalization == "spec":
