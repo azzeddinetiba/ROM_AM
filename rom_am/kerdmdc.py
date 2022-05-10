@@ -9,24 +9,17 @@ class KERDMDC:
 
     """
 
-    def kerfun(self, X, Y, kernel=None, p=2, a=1, sig=1):
+    def defker(self, kerfun=None, kernel="poly", p=2, a=1, sig=1):
         if kernel is None:
-            kernel = self.kernel
+            self.kernel = kerfun
         if kernel == "poly":
             self.kernel = lambda x, y: (1 + x.T @ y)**p
-            XTY = self.kernel(X, Y)
-            XTX = self.kernel(X, X)
         elif kernel == "sigmoid":
-            XTY = np.tanh(X.T @ Y + a)
-            XTX = np.tanh(X.T @ X + a)
+            self.kernel = lambda x, y: np.tanh(x.T @ y + a)
         elif kernel == "gaussian":
-            XTY = np.exp(-X.T @ Y)
-            XTX = np.exp(-X.T @ X)
+            self.kernel = lambda x, y: np.exp(-x.T @ y)
         elif kernel == "radial":
-            XTY = np.exp(-(X-Y).T @ (X-Y) / sig**2)
-            XTX = XTY
-
-        return XTY, XTX
+            self.kernel = lambda x, y: np.exp(-(x-y).T @ (x-y) / sig**2)
 
     def __init__(self):
 
@@ -50,7 +43,8 @@ class KERDMDC:
         self.data = None
         self._koop_eigv = None
         self._koop_mode = None
-        self._koop_eifg_coeff = None
+        self._koop_eigf_coeff = None
+        self._koop_state_coeff = None
 
     def decompose(self, X,
                   alg="snap",
@@ -65,7 +59,8 @@ class KERDMDC:
                   p=2,
                   a=1,
                   sig=1,
-                  inputfun=None):
+                  kerfun=None,
+                  output_reduc=False):
         """
         Y_input : numpy.ndarray
             Control inputs matrix data, of (, m) size
@@ -76,75 +71,43 @@ class KERDMDC:
         self.nx = X.shape[0]
         self.data_X = X
         self.init = X[:, 0]
-        self.inputfun = inputfun
         self.sorting = sorting
         self.kernel = kernel
 
-        Xin = np.vstack((X, Y_input))
-        Yout = Y.copy()
+        Xin = np.vstack((X, Y_input))  # X_input including the control inputs
+        Yout = Y  # Y_out has the vector state only
         self.Yout = Yout
         self.Xin = Xin
 
+        # Defining the used kernels
+        self.defker(kerfun, kernel=kernel, p=p, a=a, sig=sig)
+
         # Computing X.T @ Y/X using chosen kernels
-        _, XoTXo = self.kerfun(Yout, Yout, kernel, p, a, sig)
-        _, XiTXi = self.kerfun(Xin, Xin, kernel, p, a, sig)
+        XiTXi = self.kernel(Xin, Xin)
+        if output_reduc:
+            XoTXo = self.kernel(Yout, Yout)
 
         # Eigendecomposition of X.T @ Y to compute singular values and time coefficients
-        valso, vo = np.linalg.eigh(XoTXo)
-        valso = np.flip(valso)
-        vo = np.flip(vo, 1)
-        valso[valso < 1e-10] = 0
-        so = np.sqrt(valso)
-
-        if rank == 0:
-            rank = len(valso[valso > 1e-10])
-        elif 0 < rank < 1:
-            rank = np.searchsorted(
-                np.cumsum(so**2 / (so**2).sum()), rank) + 1
-
-        so = so[:rank]
-        s_invo = np.zeros(so.shape)
-        s_invo[so > 1e-10] = 1.0 / so[so > 1e-10]
-        self.tikhonov = tikhonov
-        if self.tikhonov:
-            self.x_cond = np.linalg.cond(X)
-        if self.tikhonov:
-            s_invo *= so**2 / (so**2 + self.tikhonov * self.x_cond)
-
-        vo = vo[:, :rank]
-        vho = vo.T
-
-        # Eigendecomposition of X.T @ Y to compute singular values and time coefficients
-        valsi, vi = np.linalg.eigh(XiTXi)
-
-        valsi = np.flip(valsi)
-        vi = np.flip(vi, 1)
-        valsi[valsi < 1e-10] = 0
-        si = np.sqrt(valsi)
-
-        if rank == 0:
-            rank = len(valsi[valsi > 1e-10])
-        elif 0 < rank < 1:
-            rank = np.searchsorted(
-                np.cumsum(si**2 / (si**2).sum()), rank) + 1
-
-        si = si[:rank]
-        s_invi = np.zeros(si.shape)
-        s_invi[si > 1e-10] = 1.0 / si[si > 1e-10]
-        self.tikhonov = tikhonov
-        if self.tikhonov:
-            self.x_cond = np.linalg.cond(X)
-        if self.tikhonov:
-            s_invi *= si**2 / (si**2 + self.tikhonov * self.x_cond)
-
-        vi = vi[:, :rank]
-        vhi = vi.T
+        vhi, si, s_invi = self.snap_svd(XiTXi, rank, opt_trunc, tikhonov)
+        if output_reduc:
+            vho, so, s_invo = self.snap_svd(XoTXo, rank, opt_trunc, tikhonov)
+        else:
+            vho = vhi
+            so = si
+            s_invo = s_invi
 
         # Compute K^
-        self._A = np.linalg.multi_dot((np.diag(so), vho, vi, np.diag(s_invi)))
+        self._A = np.linalg.multi_dot(
+            (np.diag(so), vho, vhi.T, np.diag(s_invi)))
+        # The A here is equivalent to the A_tilde defined in DMD
+        # as the nonlinear terms (and the according dimension)
+        # are not formulated explicitly
 
+        # SVD of the A_tilde matrix
         svdA = POD()
-        q_tilde, sig_, v_tilde = svdA.decompose(self._A, rank=rank, tikhonov = tikhonov)
+        q_tilde, sig_, v_tilde = svdA.decompose(
+            self._A, rank=rank, tikhonov=tikhonov)
+        self._kept_rank = svdA.kept_rank
 
         # Loading the DMD instance's attributes
         self.lambd = sig_
@@ -152,10 +115,12 @@ class KERDMDC:
         self.singvals = so
         self.inv_singv = s_invo
         self.s_invi = s_invi
-        self.vi = vi
+        self.vi = vhi.T
         self.time = vho
         self.modes = q_tilde
         self.rgt_modes = v_tilde.T
+
+        _ = self.koop_state_coeff
 
         return q_tilde, so, vho
 
@@ -179,18 +144,31 @@ class KERDMDC:
         return self._koop_mode
 
     @property
-    def koop_eifg_coeff(self):
-        """Returns the koopman modes.
+    def koop_eigf_coeff(self):
+        """Returns the Koopman modes.
 
         """
-        if self._koop_eifg_coeff is None:
-            self._koop_eifg_coeff = np.linalg.multi_dot(
+        if self._koop_eigf_coeff is None:
+            self._koop_eigf_coeff = np.linalg.multi_dot(
                 (self.vi, np.diag(self.s_invi), self.rgt_modes))
-        return self._koop_eifg_coeff
+        return self._koop_eigf_coeff
 
     def koop_eigf(self, x):
+        """Computes the Koopman eigenfunction at x
+
+        """
         f = self.kernel(x, self.Xin)
-        return (f @ self.koop_eifg_coeff).T
+        return self.koop_eigf_coeff.T @ f.T
+
+    @property
+    def koop_state_coeff(self):
+        """Returns the koopman eigenvalues.
+
+        """
+        if self._koop_state_coeff is None:
+            self._koop_state_coeff = np.linalg.multi_dot(
+                (self.koop_mode[:self.nx, :], np.diag(self.koop_eigv), self.koop_eigf_coeff.T))
+        return self._koop_state_coeff
 
     def predict(self, t, t1=0, rank=None, u_input=None):
         """Predict the DMD solution on the prescribed time instants.
@@ -200,10 +178,47 @@ class KERDMDC:
         t_size = u_input.shape[1]
         pred = np.empty((self.nx, t_size+1), dtype=complex)
         pred[:, 0] = self.init
-        store = self.koop_mode[:self.nx, :] @ np.diag(self.koop_eigv)
         for i in range(t_size):
             xin = np.vstack((pred[:, i].reshape((-1, 1)),
                             u_input[:, i].reshape((-1, 1))))
-            pred[:, i+1] = (store @ self.koop_eigf(xin)).ravel()
+            pred[:, i+1] = (self.koop_state_coeff @
+                            self.kernel(xin, self.Xin).T).ravel()
 
         return pred
+
+    def snap_svd(self, mat, rank, opt_trunc, tikhonov):
+        vals, v = np.linalg.eigh(mat)
+
+        vals = np.flip(vals)
+        v = np.flip(v, 1)
+        vals[vals < 1e-10] = 0
+        s = np.sqrt(vals)
+
+        if opt_trunc:
+            if self.nx <= self.n_timesteps:
+                beta = self.nx/self.n_timesteps
+            else:
+                beta = self.n_timesteps/self.nx
+            omega = 0.56 * beta**3 - 0.95 * beta**2 + 1.82 * beta + 1.43
+            tau = np.median(s) * omega
+            rank = np.sum(s > tau)
+        else:
+            if rank == 0:
+                rank = len(vals[vals > 1e-10])
+            elif 0 < rank < 1:
+                rank = np.searchsorted(
+                    np.cumsum(s**2 / (s**2).sum()), rank) + 1
+
+        s = s[:rank]
+        s_inv = np.zeros(s.shape)
+        s_inv[s > 1e-10] = 1.0 / s[s > 1e-10]
+        self.tikhonov = tikhonov
+        if self.tikhonov:
+            self.x_cond = np.linalg.cond(mat)
+        if self.tikhonov:
+            s_inv *= s**2 / (s**2 + self.tikhonov * self.x_cond)
+
+        v = v[:, :rank]
+        vh = v.T
+
+        return vh, s, s_inv

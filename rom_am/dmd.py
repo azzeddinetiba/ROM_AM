@@ -207,6 +207,14 @@ class DMD:
             phase
             Default : True
 
+        References
+        ----------
+
+        [1] On dynamic mode decomposition:  Theory and applications,
+        Journal of Computational Dynamics,1,2,391,421,2014-12-1,
+        Jonathan H. Tu,Clarence W. Rowley,Dirk M. Luchtenburg,
+        Steven L. Brunton,J. Nathan Kutz,2158-2491_2014_2_391,
+
         Returns
         ----------
             numpy.ndarray, size (N, nt)
@@ -266,6 +274,41 @@ class DMD:
         return self.predict(t, t1=self.t1)
 
     def _compute_amplitudes(self, method, rank=None):
+        """Predict the DMD solution on the prescribed time instants.
+
+        Parameters
+        ----------
+
+        method: int
+            Method used to compute the initial mode amplitudes
+            0 if it is computed on the POD subspace as in Tu et al.[1] (Least Expensive)
+            1 if it is computed using the pseudoinverse of the DMD modes along
+                the initial snapshots
+            2 if it is computed as a least square fit for the DMD modes along
+                all snapshots (Most expensive) [2]
+        rank: int or None
+            ranks kept for prediction: it should be a hard threshold integer
+            and greater than the rank chose/computed in the decomposition
+            phase. If None, the same rank already computed is used
+            Default : None
+
+        References
+        ----------
+
+        [1] On dynamic mode decomposition:  Theory and applications,
+        Journal of Computational Dynamics,1,2,391,421,2014-12-1,
+        Jonathan H. Tu,Clarence W. Rowley,Dirk M. Luchtenburg,
+        Steven L. Brunton,J. Nathan Kutz,2158-2491_2014_2_391,
+
+        [2] Higher Order Dynamic Mode Decompositio
+        Soledad Le Clainche and José M. Vega
+        SIAM Journal on Applied Dynamical Systems 2017 16:2, 882-925
+
+        Returns
+        ----------
+            numpy.ndarray, size (N, nt)
+            DMD solution on the time values t
+        """
         if method == 1:
             init = self.init
             b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
@@ -278,11 +321,16 @@ class DMD:
                 n_steps = self.n_timesteps - 1
             else:
                 n_steps = self.n_timesteps
-            L = self.low_dim_eig[:rank, :] @ np.tile(np.eye(self.lambd.shape[0]), n_steps) * \
+            
+            ## ======= The L matrix contains [W; WΛ; WΛ**2; ... ; WΛ**(m-1)]
+            # ======== Meaning L is of size (rm x r)
+            L = self.low_dim_eig[:rank, :] @ np.tile(np.eye(len(self.lambd)), n_steps) * \
                 np.tile(self.lambd, n_steps)**np.repeat(
-                np.linspace(1, n_steps, n_steps, dtype=int), self.lambd.shape[0])
+                np.linspace(1, n_steps, n_steps, dtype=int), len(self.lambd))
             L = np.vstack((self.low_dim_eig[:rank, :], L.reshape(
-                rank, -1, self.lambd.shape[0]).swapaxes(0, 1).reshape((-1, self.lambd.shape[0]))))
+                rank, -1, len(self.lambd)).swapaxes(0, 1).reshape((-1, len(self.lambd)))))
+            ## ========== Solving the lstsq system L b = v
+            # =========== where v are the pod coefficients of snapshots (i.e of size(rm, ))
             b, _, _, _ = np.linalg.lstsq(
                 L, (self.pod_coeff[:rank, :]).reshape((-1, 1), order='F').ravel(), rcond=None)
         else:

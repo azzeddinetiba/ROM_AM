@@ -165,7 +165,10 @@ class ROM:
             ROM solution on the time values t
         """
         try:
-            kwargs["u_input"] = kwargs["u_input"]/self.snap_norms[-1]
+            try:
+                kwargs["u_input"] = kwargs["u_input"]/self.snap_norms[-1]
+            except KeyError:
+                pass
         except AttributeError:
             pass
         t0 = time.time()
