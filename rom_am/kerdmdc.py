@@ -19,7 +19,8 @@ class KERDMDC:
         elif kernel == "gaussian":
             self.kernel = lambda x, y: np.exp(-x.T @ y)
         elif kernel == "radial":
-            self.kernel = lambda x, y: np.exp(-(x-y).T @ (x-y) / sig**2)
+            self.kernel = lambda x, y: np.exp((np.einsum(
+                'ij,ij->j', x, x)[:, None] + np.einsum('ij,ij->j', y, y)[None, :] - 2 * np.dot(x.T, y))/(-sig**2))
 
     def __init__(self):
 
@@ -59,8 +60,7 @@ class KERDMDC:
                   p=2,
                   a=1,
                   sig=1,
-                  kerfun=None,
-                  output_reduc=False):
+                  kerfun=None):
         """
         Y_input : numpy.ndarray
             Control inputs matrix data, of (, m) size
@@ -84,17 +84,11 @@ class KERDMDC:
 
         # Computing X.T @ Y/X using chosen kernels
         XiTXi = self.kernel(Xin, Xin)
-        if output_reduc:
-            XoTXo = self.kernel(Yout, Yout)
+        XoTXo = self.kernel(Yout, Yout)
 
         # Eigendecomposition of X.T @ Y to compute singular values and time coefficients
         vhi, si, s_invi = self.snap_svd(XiTXi, rank, opt_trunc, tikhonov)
-        if output_reduc:
-            vho, so, s_invo = self.snap_svd(XoTXo, rank, opt_trunc, tikhonov)
-        else:
-            vho = vhi
-            so = si
-            s_invo = s_invi
+        vho, so, s_invo = self.snap_svd(XoTXo, rank, opt_trunc, tikhonov)
 
         # Compute K^
         self._A = np.linalg.multi_dot(
