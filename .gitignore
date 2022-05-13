@@ -128,6 +128,12 @@ DATA/*/*/*.csv
 DATA/*/*/**.h3d
 DATA/*/*/*.oml
 DAYA/struc_doe_csv/
+References/*.mp4
+References/*.pdf
+References/*/*.mp4
+References/*/*.pdf
+References/*/*.h5
+References/*/*.vtk
 
 /Figures/*
 /examples/fsi_test_case figures.ipynb
