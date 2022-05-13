@@ -127,6 +127,7 @@ DATA/Parametric/*/*.txt
 DATA/*/*/*.csv
 DATA/*/*/**.h3d
 DATA/*/*/*.oml
+DAYA/struc_doe_csv/
 
 /Figures/*
 /examples/fsi_test_case figures.ipynb
