@@ -52,6 +52,7 @@ class ParROM:
                   **kwargs,):
 
         self.snapshots = X.copy()
+        self.params = params.copy()
         if center:
             self.center = center
             self._center()
@@ -66,7 +67,7 @@ class ParROM:
 
         t0 = time.time()
         u, s, vh = self.model.decompose(X=self.snapshots,
-                                        params=params,
+                                        params=self.params,
                                         alg=alg,
                                         rank1=rank1,
                                         rank2=rank2,
@@ -103,6 +104,13 @@ class ParROM:
 
             self.snapshots = self.snapshots / \
                 self.snap_norms[np.newaxis, :, np.newaxis]
+
+            self.param_norms = np.linalg.norm(self.params, axis=1)
+            self.param_norms = np.where(np.isclose(
+                self.param_norms, 0), 1, self.param_norms).mean(axis=0)
+
+            self.param_norms = self.param_norms / \
+                self.param_norms[np.newaxis, :, np.newaxis]
 
         elif self.normalization == "spec":
             assert self.norm_info is not None, "Values for specific normalization are not assigned through the \

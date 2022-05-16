@@ -1,6 +1,7 @@
 import imp
 import numpy as np
 from scipy import interpolate
+from scipy.interpolate import RBFInterpolator
 from .pod import POD
 from .dmd import DMD
 from .hodmd import HODMD
@@ -33,7 +34,7 @@ class ParDMD:
         X : numpy.ndarray
             Parametric snapshot matrix data, of (p, N, m) size
         params : numpy.ndarray
-            Parameters in a (p, ) array
+            Parameters in a (k, p) array
         dt : float
             value of time step from each column in X to the next column
         alg : str, optional
@@ -80,6 +81,7 @@ class ParDMD:
             self.x_cond = np.linalg.cond(self.stacked_X)
 
         self.params = params
+        self._k = params.shape[1]
 
         # POD Decomposition of the stacked X's POD coefficients
         self.pod_ = POD()
@@ -135,7 +137,7 @@ class ParDMD:
 
         return u, s, vh
 
-    def predict(self, t, mu, t1, rank=None, stabilize=False):
+    def predict(self, t, mu, t1, rank=None, stabilize=False, kernel='thin_plate_spline', method=0):
         """Predict the parDMD solution on the prescribed time instants and 
         the target aprameter value.
 
@@ -167,9 +169,13 @@ class ParDMD:
                 (self._kept_rank * self._p, t.shape[0]), dtype=complex)
             for i in range(self._p):
                 sample_res[i*self._kept_rank:(i+1)*self._kept_rank, :] = self.dmd_model[i].predict(
-                    t=t, t1=t1, method=0, rank=rank, stabilize=stabilize)
+                    t=t, t1=t1, method=method, rank=rank, stabilize=stabilize)
 
-        f = interpolate.interp1d(self.params, sample_res.reshape(
-            (self._p, self._kept_rank, -1)).T.swapaxes(0, 1), kind='cubic')  # sample_res shaped towards (n, m, p)
+        # f = interpolate.interp1d(self.params, sample_res.reshape(
+        #      (self._p, self._kept_rank, -1)).T.swapaxes(0, 1), kind='cubic')  # sample_res shaped towards (n, m, p)
 
-        return self.pod_.modes @ f(mu)
+        f = RBFInterpolator(self.params, sample_res.reshape(
+            (self._p, self._kept_rank, -1)).T.swapaxes(0, 1).T, kernel=kernel)
+        self.tst = sample_res.reshape(
+            (self._p, self._kept_rank, -1)).T.swapaxes(0, 1).T
+        return self.pod_.modes @ f(mu).T[:, :, 0]
