@@ -66,6 +66,7 @@ class KERDMD(DMD):
         """
         self.n_timesteps = X.shape[1]
         self.init = X[:, 0]
+        self.X_data = X
 
         # Defining the used kernels
         self.defker(kerfun, kernel=kernel, p=p, a=a, sig=sig)
@@ -100,6 +101,7 @@ class KERDMD(DMD):
         # Loading the DMD instance's attributes
         self.dt = dt
         self.singvals = s
+        self.singvals_inv = s_inv
         self.time = vh
         self.dmd_modes = phi
         self.lambd = lambd
@@ -146,3 +148,34 @@ class KERDMD(DMD):
         self._kept_rank = rank
 
         return vh, s, s_inv
+
+    @property
+    def left_eigvectors(self):
+        """Returns the left eigenvectors of the DMD operator.
+
+        """
+        print("The left eigenvectors are not available in KerDMD, \
+            because the observables are not known explicitly")
+        raise NotImplementedError
+
+    def koop_eigf(self, x):
+        """Computes the Koopman eigenfunction at x
+
+        Parameters
+        ----------
+
+        x: ndarray, of shape (N, nt)
+            m points of N dimension at which eigenfunctions will
+            be computes
+            N must be the same as the dimension of snapshots
+
+        Returns
+        ----------
+            numpy.ndarray, size (k, nt)
+            the k eigenfunctions computed at the x points
+
+        """
+
+        return np.linalg.multi_dot((self.low_dim_left_eig.T,
+                                    np.diag(self.singvals_inv), self.time,
+                                    self.kernel(x, self.X_data).T))

@@ -43,7 +43,7 @@ class KERDMDC:
         self.stock = False
         self.data = None
         self._koop_eigv = None
-        self._koop_mode = None
+        self._koop_modes = None
         self._koop_eigf_coeff = None
         self._koop_state_coeff = None
 
@@ -128,14 +128,14 @@ class KERDMDC:
         return self._koop_eigv
 
     @property
-    def koop_mode(self):
+    def koop_modes(self):
         """Returns the koopman modes.
 
         """
-        if self._koop_mode is None:
-            self._koop_mode = np.linalg.multi_dot(
+        if self._koop_modes is None:
+            self._koop_modes = np.linalg.multi_dot(
                 (self.Yout, self.time.T, np.diag(self.inv_singv), self.modes))
-        return self._koop_mode
+        return self._koop_modes
 
     @property
     def koop_eigf_coeff(self):
@@ -161,7 +161,7 @@ class KERDMDC:
         """
         if self._koop_state_coeff is None:
             self._koop_state_coeff = np.linalg.multi_dot(
-                (self.koop_mode[:self.nx, :], np.diag(self.koop_eigv), self.koop_eigf_coeff.T))
+                (self.koop_modes[:self.nx, :], np.diag(self.koop_eigv), self.koop_eigf_coeff.T))
         return self._koop_state_coeff
 
     def predict(self, t, t1=0, rank=None, u_input=None):

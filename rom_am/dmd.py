@@ -1,3 +1,4 @@
+from re import A
 import numpy as np
 from .pod import POD
 import warnings
@@ -29,6 +30,10 @@ class DMD:
         self._pod_coeff = None
         self.stock = False
         self.data = None
+        self._koop_eigv = None
+        self.koop_modes = None
+        self._left_eigenvectors = None
+        self.low_dim_left_eig = None
 
     def decompose(self,
                   X,
@@ -172,6 +177,7 @@ class DMD:
         # Loading the DMD instance's attributes
         self.dt = dt
         self.dmd_modes = phi
+        self._koop_modes = self.dmd_modes
         self.lambd = lambd
         self.eigenvalues = omega
         self.singvals = s
@@ -321,15 +327,15 @@ class DMD:
                 n_steps = self.n_timesteps - 1
             else:
                 n_steps = self.n_timesteps
-            
-            ## ======= The L matrix contains [W; WΛ; WΛ**2; ... ; WΛ**(m-1)]
+
+            # ======= The L matrix contains [W; WΛ; WΛ**2; ... ; WΛ**(m-1)]
             # ======== Meaning L is of size (rm x r)
             L = self.low_dim_eig[:rank, :] @ np.tile(np.eye(len(self.lambd)), n_steps) * \
                 np.tile(self.lambd, n_steps)**np.repeat(
                 np.linspace(1, n_steps, n_steps, dtype=int), len(self.lambd))
             L = np.vstack((self.low_dim_eig[:rank, :], L.reshape(
                 rank, -1, len(self.lambd)).swapaxes(0, 1).reshape((-1, len(self.lambd)))))
-            ## ========== Solving the lstsq system L b = v
+            # ========== Solving the lstsq system L b = v
             # =========== where v are the pod coefficients of snapshots (i.e of size(rm, ))
             b, _, _, _ = np.linalg.lstsq(
                 L, (self.pod_coeff[:rank, :]).reshape((-1, 1), order='F').ravel(), rcond=None)
@@ -356,3 +362,71 @@ class DMD:
             else:
                 self._pod_coeff = np.diag(self.singvals) @ self.time
         return self._pod_coeff
+
+    @property
+    def koop_modes(self):
+        """Returns the koopman modes.
+
+        """
+        try:
+            if self._koop_modes is None:
+                self._koop_modes = self.dmd_modes
+            return self._koop_modes
+        except AttributeError:
+            raise AttributeError("DMD Decomposition is not yet computed")
+
+    @property
+    def koop_eigv(self):
+        """Returns the koopman eigenvalues.
+
+        """
+        try:
+            if self._koop_eigv is None:
+                self._koop_eigv = self.eigenvalues
+            return self._koop_eigv
+        except AttributeError:
+            raise AttributeError("DMD Decomposition is not yet computed")
+
+    @property
+    def low_dim_left_eig(self):
+        """Returns the reduced left eigenvectors
+
+        """
+        if self._low_dim_left_eig is None:
+            # Left Eigendecomposition on the low dimensional operator
+            lambd, w = np.linalg.eig(self.A_tilde.T)
+            idx = (np.abs(lambd)).argsort()[::-1]
+            lambd = lambd[idx]
+            w = w[:, idx]
+            self._low_dim_left_eig = w
+        return self._low_dim_left_eig
+
+    @property
+    def left_eigvectors(self):
+        """Returns the left eigenvectors of the DMD operator.
+
+        """
+        if self._left_eigenvectors is None:
+            self._left_eigenvectors = self.modes @ self.low_dim_left_eig
+
+        return self._left_eigenvectors
+
+    def koop_eigf(self, x):
+        """Computes the Koopman eigenfunction at x
+
+        Parameters
+        ----------
+
+        x: ndarray, of shape (N, nt)
+            m points of N dimension at which eigenfunctions will
+            be computes
+            N must be the same as the dimension of snapshots
+
+        Returns
+        ----------
+            numpy.ndarray, size (k, nt)
+            the k eigenfunctions computed at the x points
+
+        """
+
+        return self.left_eigvectors.T @ x
