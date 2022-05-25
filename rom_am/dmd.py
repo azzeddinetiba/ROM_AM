@@ -1,3 +1,4 @@
+from re import A
 import numpy as np
 from .pod import POD
 import warnings
@@ -29,6 +30,10 @@ class DMD:
         self._pod_coeff = None
         self.stock = False
         self.data = None
+        self._koop_eigv = None
+        self._koop_modes = None
+        self._left_eigenvectors = None
+        self._low_dim_left_eig = None
 
     def decompose(self,
                   X,
@@ -122,6 +127,7 @@ class DMD:
 
         self.n_timesteps = X.shape[1]
         self.init = X[:, 0]
+        self.sorting = sorting
 
         if stock:
             self.stock = True
@@ -172,6 +178,7 @@ class DMD:
         # Loading the DMD instance's attributes
         self.dt = dt
         self.dmd_modes = phi
+        self._koop_modes = self.dmd_modes
         self.lambd = lambd
         self.eigenvalues = omega
         self.singvals = s
@@ -206,6 +213,14 @@ class DMD:
             DMD eigenvalue-shifting to stable eigenvalues at the prediction
             phase
             Default : True
+
+        References
+        ----------
+
+        [1] On dynamic mode decomposition:  Theory and applications,
+        Journal of Computational Dynamics,1,2,391,421,2014-12-1,
+        Jonathan H. Tu,Clarence W. Rowley,Dirk M. Luchtenburg,
+        Steven L. Brunton,J. Nathan Kutz,2158-2491_2014_2_391,
 
         Returns
         ----------
@@ -266,6 +281,41 @@ class DMD:
         return self.predict(t, t1=self.t1)
 
     def _compute_amplitudes(self, method, rank=None):
+        """Predict the DMD solution on the prescribed time instants.
+
+        Parameters
+        ----------
+
+        method: int
+            Method used to compute the initial mode amplitudes
+            0 if it is computed on the POD subspace as in Tu et al.[1] (Least Expensive)
+            1 if it is computed using the pseudoinverse of the DMD modes along
+                the initial snapshots
+            2 if it is computed as a least square fit for the DMD modes along
+                all snapshots (Most expensive) [2]
+        rank: int or None
+            ranks kept for prediction: it should be a hard threshold integer
+            and greater than the rank chose/computed in the decomposition
+            phase. If None, the same rank already computed is used
+            Default : None
+
+        References
+        ----------
+
+        [1] On dynamic mode decomposition:  Theory and applications,
+        Journal of Computational Dynamics,1,2,391,421,2014-12-1,
+        Jonathan H. Tu,Clarence W. Rowley,Dirk M. Luchtenburg,
+        Steven L. Brunton,J. Nathan Kutz,2158-2491_2014_2_391,
+
+        [2] Higher Order Dynamic Mode Decompositio
+        Soledad Le Clainche and José M. Vega
+        SIAM Journal on Applied Dynamical Systems 2017 16:2, 882-925
+
+        Returns
+        ----------
+            numpy.ndarray, size (N, nt)
+            DMD solution on the time values t
+        """
         if method == 1:
             init = self.init
             b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
@@ -278,11 +328,16 @@ class DMD:
                 n_steps = self.n_timesteps - 1
             else:
                 n_steps = self.n_timesteps
-            L = self.low_dim_eig[:rank, :] @ np.tile(np.eye(self.lambd.shape[0]), n_steps) * \
+
+            # ======= The L matrix contains [W; WΛ; WΛ**2; ... ; WΛ**(m-1)]
+            # ======== Meaning L is of size (rm x r)
+            L = self.low_dim_eig[:rank, :] @ np.tile(np.eye(len(self.lambd)), n_steps) * \
                 np.tile(self.lambd, n_steps)**np.repeat(
-                np.linspace(1, n_steps, n_steps, dtype=int), self.lambd.shape[0])
+                np.linspace(1, n_steps, n_steps, dtype=int), len(self.lambd))
             L = np.vstack((self.low_dim_eig[:rank, :], L.reshape(
-                rank, -1, self.lambd.shape[0]).swapaxes(0, 1).reshape((-1, self.lambd.shape[0]))))
+                rank, -1, len(self.lambd)).swapaxes(0, 1).reshape((-1, len(self.lambd)))))
+            # ========== Solving the lstsq system L b = v
+            # =========== where v are the pod coefficients of snapshots (i.e of size(rm, ))
             b, _, _, _ = np.linalg.lstsq(
                 L, (self.pod_coeff[:rank, :]).reshape((-1, 1), order='F').ravel(), rcond=None)
         else:
@@ -308,3 +363,81 @@ class DMD:
             else:
                 self._pod_coeff = np.diag(self.singvals) @ self.time
         return self._pod_coeff
+
+    @property
+    def koop_modes(self):
+        """Returns the koopman modes.
+
+        """
+        try:
+            if self._koop_modes is None:
+                self._koop_modes = self.dmd_modes
+            return self._koop_modes
+        except AttributeError:
+            raise AttributeError("DMD Decomposition is not yet computed")
+
+    @property
+    def koop_eigv(self):
+        """Returns the koopman eigenvalues.
+
+        """
+        try:
+            if self._koop_eigv is None:
+                self._koop_eigv = self.lambd
+            return self._koop_eigv
+        except AttributeError:
+            raise AttributeError("DMD Decomposition is not yet computed")
+
+    @property
+    def low_dim_left_eig(self):
+        """Returns the reduced left eigenvectors
+
+        """
+        if self._low_dim_left_eig is None:
+            # Left Eigendecomposition on the low dimensional operator
+            lambd, w = np.linalg.eig(self.A_tilde.T)
+            if self.sorting == "abs":
+                idx = (np.abs(lambd)).argsort()[::-1]
+            else:
+                idx = (np.real(lambd)).argsort()[::-1]
+            idx = (np.abs(lambd)).argsort()[::-1]
+            lambd = lambd[idx]
+            w = w[:, idx]
+
+            # Left eigenvectors scaled so as w . v = 1.
+            inpdct = w.T @ self.low_dim_eig
+            scl = np.diag(inpdct)
+            scl = scl/np.abs(scl)
+            self._low_dim_left_eig = w/np.linalg.norm(inpdct, axis=0) * scl
+
+        return self._low_dim_left_eig
+
+    @property
+    def left_eigvectors(self):
+        """Returns the left eigenvectors of the DMD operator.
+
+        """
+        if self._left_eigenvectors is None:
+            self._left_eigenvectors = self.modes @ self.low_dim_left_eig
+
+        return self._left_eigenvectors
+
+    def koop_eigf(self, x):
+        """Computes the Koopman eigenfunction at x
+
+        Parameters
+        ----------
+
+        x: ndarray, of shape (N, nt)
+            m points of N dimension at which eigenfunctions will
+            be computes
+            N must be the same as the dimension of snapshots
+
+        Returns
+        ----------
+            numpy.ndarray, size (k, nt)
+            the k eigenfunctions computed at the x points
+
+        """
+
+        return self.left_eigvectors.T @ x

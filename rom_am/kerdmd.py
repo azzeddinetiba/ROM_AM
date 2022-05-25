@@ -6,6 +6,18 @@ from .pod import POD
 
 class KERDMD(DMD):
 
+    def defker(self, kerfun=None, kernel="poly", p=2, a=1, sig=1):
+        if kernel is None:
+            self.kernel = kerfun
+        if kernel == "poly":
+            self.kernel = lambda x, y: (1 + x.T @ y)**p
+        elif kernel == "sigmoid":
+            self.kernel = lambda x, y: np.tanh(x.T @ y + a)
+        elif kernel == "gaussian":
+            self.kernel = lambda x, y: np.exp(-x.T @ y)
+        elif kernel == "radial":
+            self.kernel = lambda x, y: np.exp(-(x-y).T @ (x-y) / sig**2)
+
     def decompose(self, X,
                   alg="snap",
                   rank=0,
@@ -54,63 +66,26 @@ class KERDMD(DMD):
         """
         self.n_timesteps = X.shape[1]
         self.init = X[:, 0]
+        self.X_data = X
+        self.sorting = sorting
+
+        # Defining the used kernels
+        self.defker(kerfun, kernel=kernel, p=p, a=a, sig=sig)
 
         # Computing X.T @ Y/X using chosen kernels
-        if kerfun is None:
-            if kernel == "poly":
-                XTY = (1 + X.T @ Y)**p
-                XTX = (1 + X.T @ X)**p
-            elif kernel == "sigmoid":
-                XTY = np.tanh(X.T @ Y + a)
-                XTX = np.tanh(X.T @ X + a)
-            elif kernel == "gaussian":
-                XTY = np.exp(-X.T @ Y)
-                XTX = np.exp(-X.T @ X)
-            elif kernel == "radial":
-                XTY = np.exp(-(X-Y).T @ (X-Y) / sig**2)
-                XTX = XTY
-        else:
-            XTY = kerfun(X, Y)
-            XTX = kerfun(X, X)
+        XTY = self.kernel(X, Y)
+        XTX = self.kernel(X, X)
 
         # Eigendecomposition of X.T @ Y to compute singular values and time coefficients
-        vals, v = np.linalg.eigh(XTX)
-
-        vals = np.flip(vals)
-        v = np.flip(v, 1)
-        vals[vals < 1e-10] = 0
-        s = np.sqrt(vals)
-
-        if opt_trunc:
-            if X.shape[0] <= X.shape[1]:
-                beta = X.shape[0]/X.shape[1]
-            else:
-                beta = X.shape[1]/X.shape[0]
-            omega = 0.56 * beta**3 - 0.95 * beta**2 + 1.82 * beta + 1.43
-            tau = np.median(s) * omega
-            rank = np.sum(s > tau)
-        else:
-            if rank == 0:
-                rank = len(vals[vals > 1e-10])
-            elif 0 < rank < 1:
-                rank = np.searchsorted(
-                    np.cumsum(s**2 / (s**2).sum()), rank) + 1
-
-        s = s[:rank]
-        s_inv = np.zeros(s.shape)
-        s_inv[s > 1e-10] = 1.0 / s[s > 1e-10]
-        self.tikhonov = tikhonov
-        if self.tikhonov:
-            self.x_cond = np.linalg.cond(X)
-        if self.tikhonov:
-            s_inv *= s**2 / (s**2 + self.tikhonov * self.x_cond)
-
-        v = v[:, :rank]
-        vh = v.T
+        vh, s, s_inv = self.snap_svd(XTX, rank, opt_trunc, tikhonov)
 
         # Computing the Koopman operator approximation
         self._A = np.linalg.multi_dot(
             (np.diag(s_inv), vh, XTY, vh.T, np.diag(s_inv)))
+        # The A here is equivalent to the A_tilde defined in DMD
+        # as the nonlinear terms (and the according dimension)
+        # are not formulated explicitly
+        self.A_tilde = self._A
 
         lambd, w = np.linalg.eig(self.A)
         if sorting == "abs":
@@ -128,6 +103,7 @@ class KERDMD(DMD):
         # Loading the DMD instance's attributes
         self.dt = dt
         self.singvals = s
+        self.singvals_inv = s_inv
         self.time = vh
         self.dmd_modes = phi
         self.lambd = lambd
@@ -135,3 +111,104 @@ class KERDMD(DMD):
         self.modes = None
 
         return 0, s, vh
+
+    def snap_svd(self, mat, rank, opt_trunc, tikhonov):
+        vals, v = np.linalg.eigh(mat)
+
+        vals = np.flip(vals)
+        v = np.flip(v, 1)
+        vals[vals < 1e-10] = 0
+        s = np.sqrt(vals)
+
+        if opt_trunc:
+            if self.init.shape[0] <= self.n_timesteps:
+                beta = self.init.shape[0]/self.n_timesteps
+            else:
+                beta = self.n_timesteps/self.init.shape[0]
+            omega = 0.56 * beta**3 - 0.95 * beta**2 + 1.82 * beta + 1.43
+            tau = np.median(s) * omega
+            rank = np.sum(s > tau)
+        else:
+            if rank == 0:
+                rank = len(vals[vals > 1e-10])
+            elif 0 < rank < 1:
+                rank = np.searchsorted(
+                    np.cumsum(s**2 / (s**2).sum()), rank) + 1
+
+        s = s[:rank]
+        s_inv = np.zeros(s.shape)
+        s_inv[s > 1e-10] = 1.0 / s[s > 1e-10]
+        self.tikhonov = tikhonov
+        if self.tikhonov:
+            self.x_cond = np.linalg.cond(mat)
+        if self.tikhonov:
+            s_inv *= s**2 / (s**2 + self.tikhonov * self.x_cond)
+
+        v = v[:, :rank]
+        vh = v.T
+
+        self._kept_rank = rank
+
+        return vh, s, s_inv
+
+    def predict(self, t, t1=0, method=0, rank=None, stabilize=True, init=None):
+        # ============================================
+        # ============================================
+        # Parameters
+        # ----------
+        # init : numpy.ndarray, size (N, )
+        #    initial condition in the first time instant of t (prediction timesteps)
+
+        # ============================================
+        # ============================================
+
+        if method != 3:
+            return super().predict(t, t1, method, rank, stabilize)
+
+        # ========= Method = 3 designed for Kernel DMD
+        # to predict using the Koopman operator
+        else:
+            if init is None:
+                init = self.init
+
+            # =============== Prediction using Koopman =====================
+            pred = np.empty((2, len(t)))
+            pred[:, 0] = init
+            phi0 = self.koop_eigf(pred[:, 0][:, np.newaxis])
+
+            for i in range(len(t)-1):
+                pred[:, i+1] = (self.dmd_modes @
+                                (np.diag(self.koop_eigv)**(i+1)) @ (phi0)).ravel()
+
+            return pred
+
+    @property
+    def left_eigvectors(self):
+        """Returns the left eigenvectors of the DMD operator.
+
+        """
+        print("The left eigenvectors are not available in KerDMD, \
+            because the observables are not known explicitly")
+        raise NotImplementedError
+
+    def koop_eigf(self, x):
+        """Computes the Koopman eigenfunction at x
+
+        Parameters
+        ----------
+
+        x: ndarray, of shape (N, nt)
+            m points of N dimension at which eigenfunctions will
+            be computes
+            N must be the same as the dimension of snapshots
+
+        Returns
+        ----------
+            numpy.ndarray, size (k, nt)
+            the k eigenfunctions computed at the x points
+
+        """
+
+        return np.linalg.multi_dot((self.low_dim_left_eig.T,
+                                    np.diag(self.singvals_inv), self.time,
+                                    self.kernel(x, self.X_data).T))
