@@ -31,9 +31,9 @@ class DMD:
         self.stock = False
         self.data = None
         self._koop_eigv = None
-        self.koop_modes = None
+        self._koop_modes = None
         self._left_eigenvectors = None
-        self.low_dim_left_eig = None
+        self._low_dim_left_eig = None
 
     def decompose(self,
                   X,
