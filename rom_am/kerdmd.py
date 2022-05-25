@@ -67,6 +67,7 @@ class KERDMD(DMD):
         self.n_timesteps = X.shape[1]
         self.init = X[:, 0]
         self.X_data = X
+        self.sorting = sorting
 
         # Defining the used kernels
         self.defker(kerfun, kernel=kernel, p=p, a=a, sig=sig)
@@ -84,6 +85,7 @@ class KERDMD(DMD):
         # The A here is equivalent to the A_tilde defined in DMD
         # as the nonlinear terms (and the according dimension)
         # are not formulated explicitly
+        self.A_tilde = self._A
 
         lambd, w = np.linalg.eig(self.A)
         if sorting == "abs":
@@ -148,6 +150,37 @@ class KERDMD(DMD):
         self._kept_rank = rank
 
         return vh, s, s_inv
+
+    def predict(self, t, t1=0, method=0, rank=None, stabilize=True, init=None):
+        # ============================================
+        # ============================================
+        # Parameters
+        # ----------
+        # init : numpy.ndarray, size (N, )
+        #    initial condition in the first time instant of t (prediction timesteps)
+
+        # ============================================
+        # ============================================
+
+        if method != 3:
+            return super().predict(t, t1, method, rank, stabilize)
+
+        # ========= Method = 3 designed for Kernel DMD
+        # to predict using the Koopman operator
+        else:
+            if init is None:
+                init = self.init
+
+            # =============== Prediction using Koopman =====================
+            pred = np.empty((2, len(t)))
+            pred[:, 0] = init
+            phi0 = self.koop_eigf(pred[:, 0][:, np.newaxis])
+
+            for i in range(len(t)-1):
+                pred[:, i+1] = (self.dmd_modes @
+                                (np.diag(self.koop_eigv)**(i+1)) @ (phi0)).ravel()
+
+            return pred
 
     @property
     def left_eigvectors(self):

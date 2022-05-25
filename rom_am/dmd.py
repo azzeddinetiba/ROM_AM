@@ -127,6 +127,7 @@ class DMD:
 
         self.n_timesteps = X.shape[1]
         self.init = X[:, 0]
+        self.sorting = sorting
 
         if stock:
             self.stock = True
@@ -382,7 +383,7 @@ class DMD:
         """
         try:
             if self._koop_eigv is None:
-                self._koop_eigv = self.eigenvalues
+                self._koop_eigv = self.lambd
             return self._koop_eigv
         except AttributeError:
             raise AttributeError("DMD Decomposition is not yet computed")
@@ -395,10 +396,20 @@ class DMD:
         if self._low_dim_left_eig is None:
             # Left Eigendecomposition on the low dimensional operator
             lambd, w = np.linalg.eig(self.A_tilde.T)
+            if self.sorting == "abs":
+                idx = (np.abs(lambd)).argsort()[::-1]
+            else:
+                idx = (np.real(lambd)).argsort()[::-1]
             idx = (np.abs(lambd)).argsort()[::-1]
             lambd = lambd[idx]
             w = w[:, idx]
-            self._low_dim_left_eig = w
+
+            # Left eigenvectors scaled so as w . v = 1.
+            inpdct = w.T @ self.low_dim_eig
+            scl = np.diag(inpdct)
+            scl = scl/np.abs(scl)
+            self._low_dim_left_eig = w/np.linalg.norm(inpdct, axis=0) * scl
+
         return self._low_dim_left_eig
 
     @property
