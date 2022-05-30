@@ -16,7 +16,8 @@ class KERDMD(DMD):
         elif kernel == "gaussian":
             self.kernel = lambda x, y: np.exp(-x.T @ y)
         elif kernel == "radial":
-            self.kernel = lambda x, y: np.exp(-(x-y).T @ (x-y) / sig**2)
+            self.kernel = lambda x, y: np.exp((np.einsum(
+                'ij,ij->j', x, x)[:, None] + np.einsum('ij,ij->j', y, y)[None, :] - 2 * np.dot(x.T, y))/(-sig**2))
 
     def decompose(self, X,
                   alg="snap",
