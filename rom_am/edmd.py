@@ -13,6 +13,7 @@ class EDMD(DMD):
     def __init__(self):
         super().__init__()
         self._accuracy = None
+        self.tall = False
 
     def decompose(self, X, alg="svd", rank=0, opt_trunc=False, tikhonov=0, sorting="abs", Y=None, dt=None, observables=None):
         """Training the extended dynamic mode decomposition[1, 3] model, using the input data X and Y
@@ -88,11 +89,6 @@ class EDMD(DMD):
         vh : numpy.ndarray, of size(r, m)
             The time dynamics of X * X.T
 
-        Notes
-        -----
-        It is advised to use this class only when the number of timesteps is much
-        bigger than the number of observables considered.
-
         """
         if observables is not None:
             if "X" in observables:
@@ -119,8 +115,7 @@ class EDMD(DMD):
         self._dim_X = X.shape[0]
 
         if X.shape[1] <= X.shape[0]:
-            warnings.warn("The input snapshots are tall and skinny, consider DMD for this kind of problems.\
-                 eDMD is best suited for fat and short matrices")
+            self.tall = True
 
         self.tikhonov = tikhonov
         if self.tikhonov:
@@ -129,51 +124,55 @@ class EDMD(DMD):
         self.n_timesteps = X.shape[1]
         self.init = X[:, 0]
 
-        A1 = Y @ X.T
-        A2 = X @ X.T
-        # POD Decomposition of the (X X.T) matrix
-        self.pod_ = POD()
-        self.pod_.decompose(A2, alg=alg, rank=rank,
-                            opt_trunc=opt_trunc)
-        u = self.pod_.modes
-        vh = self.pod_.time
-        s = self.pod_.singvals
-        s_inv = np.zeros(s.shape)
-        s_inv = 1 / s
-        s_inv_ = s_inv.copy()
-        if self.tikhonov:
-            s_inv_ *= s**2 / (s**2 + self.tikhonov * self.x_cond)
-        A2_pinv = np.linalg.multi_dot((vh.T, np.diag(s_inv_), u.T))
-        self._kept_rank = self.pod_.kept_rank
+        if self.tall and not self._rectangular:
+            u, s, vh = super().decompose(X=X, alg=alg, rank=rank, opt_trunc=opt_trunc,
+                                         tikhonov=tikhonov, sorting=sorting, Y=Y, dt=dt)
+        else:
+            A1 = Y @ X.T
+            A2 = X @ X.T
+            # POD Decomposition of the (X X.T) matrix
+            self.pod_ = POD()
+            self.pod_.decompose(A2, alg=alg, rank=rank,
+                                opt_trunc=opt_trunc)
+            u = self.pod_.modes
+            vh = self.pod_.time
+            s = self.pod_.singvals
+            s_inv = np.zeros(s.shape)
+            s_inv = 1 / s
+            s_inv_ = s_inv.copy()
+            if self.tikhonov:
+                s_inv_ *= s**2 / (s**2 + self.tikhonov * self.x_cond)
+            A2_pinv = np.linalg.multi_dot((vh.T, np.diag(s_inv_), u.T))
+            self._kept_rank = self.pod_.kept_rank
 
-        # Computing the Koopman operator approximation
-        self._A = A1 @ A2_pinv
+            # Computing the Koopman operator approximation
+            self._A = A1 @ A2_pinv
 
-        # Eigendecomposition on the Koopman operator
-        if not self._rectangular:
-            lambd, w = np.linalg.eig(self.A)
-            if sorting == "abs":
-                idx = (np.abs(lambd)).argsort()[::-1]
-            else:
-                idx = (np.real(lambd)).argsort()[::-1]
-            lambd = lambd[idx]
-            w = w[:, idx]
-            self.low_dim_eig = w
+            # Eigendecomposition on the Koopman operator
+            if not self._rectangular:
+                lambd, w = np.linalg.eig(self.A)
+                if sorting == "abs":
+                    idx = (np.abs(lambd)).argsort()[::-1]
+                else:
+                    idx = (np.real(lambd)).argsort()[::-1]
+                lambd = lambd[idx]
+                w = w[:, idx]
+                self.low_dim_eig = w
 
-            # Computing the high-dimensional DMD modes
-            phi = w.copy()
-            omega = np.log(lambd) / dt  # Continuous system eigenvalues
+                # Computing the high-dimensional DMD modes
+                phi = w.copy()
+                omega = np.log(lambd) / dt  # Continuous system eigenvalues
+
+                # Loading the DMD instance's attributes
+                self.dmd_modes = phi
+                self.lambd = lambd
+                self.eigenvalues = omega
 
             # Loading the DMD instance's attributes
-            self.dmd_modes = phi
-            self.lambd = lambd
-            self.eigenvalues = omega
-
-        # Loading the DMD instance's attributes
-        self.dt = dt
-        self.singvals = s
-        self.modes = u
-        self.time = vh
+            self.dt = dt
+            self.singvals = s
+            self.modes = u
+            self.time = vh
 
         return u, s, vh
 
