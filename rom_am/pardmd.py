@@ -137,7 +137,7 @@ class ParDMD:
 
         return u, s, vh
 
-    def predict(self, t, mu, t1, rank=None, stabilize=False, kernel='thin_plate_spline', method=0):
+    def predict(self, t, mu, t1, rank=None, stabilize=False, kernel='thin_plate_spline', method=0, epsilon=None):
         """Predict the parDMD solution on the prescribed time instants and 
         the target aprameter value.
 
@@ -145,7 +145,7 @@ class ParDMD:
         ----------
         t : numpy.ndarray, size (nt, )
             time steps at which the parDMD solution will be computed
-        mu : float
+        mu : numpy.darray, size(k, 1)
             Parameter value for prediction
         t1: float
             the value of the time instant of the first snapshot
@@ -172,6 +172,6 @@ class ParDMD:
                     t=t, t1=t1, method=method, rank=rank, stabilize=stabilize)
 
         f = RBFInterpolator(self.params.T, sample_res.reshape(
-            (self._p, self._kept_rank, -1)).T.swapaxes(0, 1).T, kernel=kernel)
+            (self._p, self._kept_rank, -1)).T.swapaxes(0, 1).T, kernel=kernel, epsilon=epsilon)
 
         return self.pod_.modes @ f(mu).T[:, :, 0]
