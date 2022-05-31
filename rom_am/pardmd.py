@@ -171,11 +171,7 @@ class ParDMD:
                 sample_res[i*self._kept_rank:(i+1)*self._kept_rank, :] = self.dmd_model[i].predict(
                     t=t, t1=t1, method=method, rank=rank, stabilize=stabilize)
 
-        # f = interpolate.interp1d(self.params, sample_res.reshape(
-        #      (self._p, self._kept_rank, -1)).T.swapaxes(0, 1), kind='cubic')  # sample_res shaped towards (n, m, p)
-
-        f = RBFInterpolator(self.params, sample_res.reshape(
+        f = RBFInterpolator(self.params.T, sample_res.reshape(
             (self._p, self._kept_rank, -1)).T.swapaxes(0, 1).T, kernel=kernel)
-        self.tst = sample_res.reshape(
-            (self._p, self._kept_rank, -1)).T.swapaxes(0, 1).T
+
         return self.pod_.modes @ f(mu).T[:, :, 0]

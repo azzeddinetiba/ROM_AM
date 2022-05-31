@@ -107,10 +107,10 @@ class ParROM:
 
             self.param_norms = np.linalg.norm(self.params, axis=1)
             self.param_norms = np.where(np.isclose(
-                self.param_norms, 0), 1, self.param_norms).mean(axis=0)
+                self.param_norms, 0), 1, self.param_norms)
 
-            self.param_norms = self.param_norms / \
-                self.param_norms[np.newaxis, :, np.newaxis]
+            self.params = self.params / \
+                self.param_norms[:, np.newaxis]
 
         elif self.normalization == "spec":
             assert self.norm_info is not None, "Values for specific normalization are not assigned through the \
@@ -190,13 +190,15 @@ class ParROM:
             numpy.ndarray, size (N, nt)
             ROM solution on the time values t
         """
+        if self.normalize:
+            mu = mu/self.param_norms[:, np.newaxis]
         t0 = time.time()
         res = self.model.predict(t=t, mu=mu, t1=t1, rank=rank, *args, **kwargs)
+        t1 = time.time()
         if self.normalize:
             res = self._denormalize(res)
         if self.center:
             res = self._decenter(res)
-        t1 = time.time()
         self.profile["Prediction time"] = t1-t0
         return res
 
