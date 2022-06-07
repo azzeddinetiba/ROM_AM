@@ -173,13 +173,13 @@ class KERDMD(DMD):
                 init = self.init
 
             # =============== Prediction using Koopman =====================
-            pred = np.empty((2, len(t)))
-            pred[:, 0] = init
-            phi0 = self.koop_eigf(pred[:, 0][:, np.newaxis])
+            nt = len(t)
+            phi0 = self.koop_eigf(init[:, np.newaxis])[:, 0]  # Amplitudes
+            eigv = np.power(self.koop_eigv[:, np.newaxis], np.arange(
+                0, nt, 1))  # Dynamics (of shape (k, nt))
 
-            for i in range(len(t)-1):
-                pred[:, i+1] = (self.dmd_modes @
-                                (np.diag(self.koop_eigv)**(i+1)) @ (phi0)).ravel()
+            # Modes @ Amplitudes @ Dynamics
+            pred = np.linalg.multi_dot((self.dmd_modes, np.diag(phi0), eigv))
 
             return pred
 
