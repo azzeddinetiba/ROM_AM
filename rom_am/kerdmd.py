@@ -1,7 +1,6 @@
 import numpy as np
 from numpy import s_
 from .dmd import DMD
-from .pod import POD
 
 
 class KERDMD(DMD):
@@ -164,7 +163,7 @@ class KERDMD(DMD):
         # ============================================
 
         if method != 3:
-            return super().predict(t, t1, method, rank, stabilize)
+            return super().predict(t, t1, method, rank, stabilize, init)
 
         # ========= Method = 3 designed for Kernel DMD
         # to predict using the Koopman operator

@@ -187,7 +187,7 @@ class DMD:
 
         return u, s, vh
 
-    def predict(self, t, t1=0, method=0, rank=None, stabilize=True):
+    def predict(self, t, t1=0, method=0, rank=None, stabilize=True, init=None):
         """Predict the DMD solution on the prescribed time instants.
 
         Parameters
@@ -195,7 +195,9 @@ class DMD:
         t : numpy.ndarray, size (nt, )
             time steps at which the DMD solution will be computed
         t1: float
-            the value of the time instant of the first snapshot
+            the value of the time instant of the first data snapshot
+            If 'method=1' is used and t1 indicates the time isntant 
+            when the solution corresponds to 'init'
         rank: int or None
             ranks kept for prediction: it should be a hard threshold integer
             and greater than the rank chose/computed in the decomposition
@@ -213,7 +215,20 @@ class DMD:
             DMD eigenvalue-shifting to stable eigenvalues at the prediction
             phase
             Default : True
-
+        init : int or ndarray or None, optional
+            The initial condition used to compute the amplitudes
+            it is an :
+                - int when used with 'method = 0', representing the index
+                of the snapshot used from the snapshots training data.
+                Note that here t1 will be taken as the time insant at that
+                snapshot (init * dt), so the t1 argument is here the time
+                instant of the first snapshot data.
+                - ndarray of size (n, ) when used with 'method = 1',
+                representing the prescribed initial condition at t = t1 (It has
+                to be prescribed accordingly).
+                - None, then the first data snapshot will be used
+                whether in 'method = 0' or 'method = 1'
+            Default None
         References
         ----------
 
@@ -230,7 +245,6 @@ class DMD:
         if self.dmd_modes is None:
             raise Exception("The DMD decomposition hasn't been executed yet")
 
-        self.t1 = t1
         if rank is None:
             rank = self._kept_rank
         elif not (isinstance(rank, int) and 0 < rank < self.kept_rank):
@@ -238,13 +252,19 @@ class DMD:
                           "rank chosen/computed at the decomposition phase. Please see the rank value in self.kept_rank")
             rank = self._kept_rank
 
-        b = self._compute_amplitudes(method, rank=self.pred_rank)
+        b = self._compute_amplitudes(method, rank=self.pred_rank, initial=init)
 
         eig = self.eigenvalues[:rank]
         if stabilize:
             eig_rmpl = eig[np.abs(self.lambd[:rank]) > 1]
             eig_rmpl.real = 0
             eig[np.abs(self.lambd[:rank]) > 1] = eig_rmpl
+
+        self.t1 = t1
+        if method == 0:
+            if init is None:
+                init = 0.
+            t1 = self.t1 + init * self.dt
 
         return self.dmd_modes[:, :rank] @ (np.exp(np.outer(eig, t-t1).T) * b[:rank]).T
 
@@ -280,7 +300,7 @@ class DMD:
                         * self.dt, self.n_timesteps)
         return self.predict(t, t1=self.t1)
 
-    def _compute_amplitudes(self, method, rank=None):
+    def _compute_amplitudes(self, method, rank=None, initial=None):
         """Predict the DMD solution on the prescribed time instants.
 
         Parameters
@@ -298,6 +318,19 @@ class DMD:
             and greater than the rank chose/computed in the decomposition
             phase. If None, the same rank already computed is used
             Default : None
+        initial : int or ndarray or None, optional
+            The initial condition used to compute the amplitudes
+            it is an :
+                - int when used with 'method = 0', representing the index
+                of the snapshot used from the snapshots training data.
+                Note that here t1 will be taken as the time insant at that
+                snapshot (init * dt), so the t1 argument is here the time
+                instant of the first snapshot data.
+                - ndarray of size (n, ) when used with 'method = 1',
+                representing the prescribed initial condition at t = t1 (It has
+                to be prescribed accordingly).
+                - None, then the first data snapshot will be used
+                whether in 'method = 0' or 'method = 1'
 
         References
         ----------
@@ -317,8 +350,15 @@ class DMD:
             DMD solution on the time values t
         """
         if method == 1:
-            init = self.init
-            b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
+            if initial is None:
+                init = self.init
+            else:
+                init = initial
+            try:
+                b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
+            except:
+                raise Exception(
+                    "The init argument should be an ndarray or None when 'method=1' is used")
         elif method == 2:
             if rank is None:
                 rank = self._kept_rank
@@ -341,7 +381,13 @@ class DMD:
             b, _, _, _ = np.linalg.lstsq(
                 L, (self.pod_coeff[:rank, :]).reshape((-1, 1), order='F').ravel(), rcond=None)
         else:
-            alpha1 = self.singvals * self.time[:, 0]
+            if initial is None:
+                initial = 0
+            try:
+                alpha1 = self.singvals * self.time[:, initial]
+            except:
+                raise Exception(
+                    "init argument should be an int or None when 'method=0' is used")
             b = np.linalg.solve(self.lambd * self.low_dim_eig, alpha1)
         return b
 

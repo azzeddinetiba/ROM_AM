@@ -183,7 +183,7 @@ class EDMD(DMD):
         b /= np.exp(self.eigenvalues * t1)
         return b
 
-    def predict(self, t, t1=0, method=1, rank=None, stabilize=True, x_input=None):
+    def predict(self, t, t1=0, method=1, rank=None, stabilize=True, x_input=None, init=None):
         """Predict the eDMD solution on the prescribed time instants.
 
         Parameters
@@ -192,8 +192,11 @@ class EDMD(DMD):
             time steps at which the DMD solution will be computed
             If x_input is given, this argument is disregarded
         t1: float
-            the value of the time instant of the first snapshot
+            the value of the time instant of the first data snapshot
+            If 'method=1' is used and t1 indicates the time isntant 
+            when the solution corresponds to 'init'
             If x_input is given, this argument is disregarded
+            Default 0.
         rank: int or None
             ranks kept for prediction: it should be a hard threshold integer
             and greater than the rank chose/computed in the decomposition
@@ -215,6 +218,20 @@ class EDMD(DMD):
             Values of X data in the prediction phase. Should be given
             in case the eDMD operator is rectangular, i.e X and Y do not have
             the same dimensions
+        init : int or ndarray or None, optional
+            The initial condition used to compute the amplitudes
+            it is an :
+                - int when used with 'method = 0', representing the index
+                of the snapshot used from the snapshots training data.
+                Note that here t1 will be taken as the time insant at that
+                snapshot (init * dt), so the t1 argument is here the time
+                instant of the first snapshot data.
+                - ndarray of size (n, ) when used with 'method = 1',
+                representing the prescribed initial condition at t = t1 (It has
+                to be prescribed accordingly).
+                - None, then the first data snapshot will be used
+                whether in 'method = 0' or 'method = 1'
+            Default None
         Returns
         ----------
             numpy.ndarray, size (N, nt)
@@ -223,7 +240,7 @@ class EDMD(DMD):
         if self._rectangular:
             return self.A @ x_input
         else:
-            return super().predict(t, t1, method, rank, stabilize)
+            return super().predict(t, t1, method, rank, stabilize, init)
 
     def reconstruct(self, rank=None):
         if self._rectangular:
