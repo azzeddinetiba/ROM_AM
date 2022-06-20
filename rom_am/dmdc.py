@@ -232,14 +232,12 @@ class DMDc:
             if method:
                 init = self.init
                 b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
-                b /= np.exp(self.eigenvalues * t1)
             else:
                 alpha1 = self.singvals[:rank] * self.time[:rank, 0]
-                b = np.linalg.solve(self.lambd[:rank] * self.low_dim_eig[:rank, :rank], alpha1) / np.exp(
-                    eig * t1
-                )
+                b = np.linalg.solve(
+                    self.lambd[:rank] * self.low_dim_eig[:rank, :rank], alpha1)
 
-            return self.dmd_modes[:, :rank] @ ((np.exp(np.outer(eig, t).T) * b).T
+            return self.dmd_modes[:, :rank] @ ((np.exp(np.outer(eig, (t-t1)).T) * b).T
                                                - (self.control_component @ u_input[:, 0] / eig)[:, np.newaxis])
 
     def reconstruct(self, rank=None):

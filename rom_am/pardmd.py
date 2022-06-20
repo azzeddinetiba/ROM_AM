@@ -17,16 +17,16 @@ class ParDMD:
                   X,
                   params,
                   alg="svd",
-                  rank1=0,
-                  rank2=0,
+                  rank=0,
                   opt_trunc=False,
                   tikhonov=0,
                   sorting="abs",
+                  rank2=0,
                   dt=None,
                   dmd_model="dmd",
                   hod=50,
                   partitioned=True):
-        """Training the Parametric dynamic mode decomposition[model, 
+        """Training the Parametric dynamic mode decomposition model 
         using the input data X and the training parameters params
 
         Parameters
@@ -42,6 +42,8 @@ class ParDMD:
             the eigenvalue problem on snaphot matrices ("snap")
             Default : "svd"
         rank1 : int or float, optional
+            Rank chosen for the truncation of the stacked snapshots
+            SVD.
             if rank1 = 0 All the ranks are kept, unless their
             singular values are zero
             if 0 < rank < 1, it is used as the percentage of
@@ -49,6 +51,8 @@ class ParDMD:
             computed accordingly
             Default : 0
         rank2 : int or float, optional
+            Rank chosen for the truncation of the POD coefficients
+            inside the DMD algrithm.
             if rank = 0 All the ranks are kept, unless their
             singular values are zero
             if 0 < rank < 1, it is used as the percentage of
@@ -85,7 +89,7 @@ class ParDMD:
 
         # POD Decomposition of the stacked X's POD coefficients
         self.pod_ = POD()
-        self.pod_.decompose(self.stacked_X, alg=alg, rank=rank1,
+        self.pod_.decompose(self.stacked_X, alg=alg, rank=rank,
                             opt_trunc=opt_trunc)
         u = self.pod_.modes
         vh = self.pod_.time
@@ -148,7 +152,10 @@ class ParDMD:
         mu : numpy.darray, size(k, 1)
             Parameter value for prediction
         t1: float
-            the value of the time instant of the first snapshot
+            the value of the time instant of the first data snapshot
+            If 'method=1' is used and t1 indicates the time isntant 
+            when the solution corresponds to 'init'
+            Default 0.
         rank: int or None
             ranks kept for prediction: it should be a hard threshold integer
             and greater than the rank chose/computed in the decomposition
