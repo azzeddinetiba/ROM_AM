@@ -196,7 +196,7 @@ class DMD:
             time steps at which the DMD solution will be computed
         t1: float
             the value of the time instant of the first data snapshot
-            If 'method=1' is used and t1 indicates the time isntant 
+            If 'method=1' is used and t1 indicates the time instant 
             when the solution corresponds to 'init'
         rank: int or None
             ranks kept for prediction: it should be a hard threshold integer
@@ -382,6 +382,7 @@ class DMD:
                 L, (self.pod_coeff[:rank, :]).reshape((-1, 1), order='F').ravel(), rcond=None)
         else:
             if initial is None:
+                # The default choice is using the first snapshot's POD coefficients
                 initial = 0
             try:
                 alpha1 = self.singvals * self.time[:, initial]

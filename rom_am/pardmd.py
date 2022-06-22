@@ -141,7 +141,7 @@ class ParDMD:
 
         return u, s, vh
 
-    def predict(self, t, mu, t1, rank=None, stabilize=False, kernel='thin_plate_spline', method=0, epsilon=None):
+    def predict(self, t, mu, t1, rank=None, stabilize=False, init=None, kernel='thin_plate_spline', method=0, epsilon=None):
         """Predict the parDMD solution on the prescribed time instants and 
         the target aprameter value.
 
@@ -167,16 +167,20 @@ class ParDMD:
             numpy.ndarray, size (N, nt)
             parDMD solution on the time values t and parameter value mu
         """
+        init_ = None
+        if init is not None:
+            init_ = self.pod_.modes.T @ init
+
         if not self.is_Partitioned:
             sample_res = self.dmd_model.predict(
-                t=t, t1=t1, method=0, rank=rank, stabilize=stabilize)  # of shape (n * p, m)
+                t=t, t1=t1, method=0, rank=rank, stabilize=stabilize, init=init_)  # of shape (n * p, m)
 
         else:
             sample_res = np.empty(
                 (self._kept_rank * self._p, t.shape[0]), dtype=complex)
             for i in range(self._p):
                 sample_res[i*self._kept_rank:(i+1)*self._kept_rank, :] = self.dmd_model[i].predict(
-                    t=t, t1=t1, method=method, rank=rank, stabilize=stabilize)
+                    t=t, t1=t1, method=method, rank=rank, stabilize=stabilize, init=init_)
 
         f = RBFInterpolator(self.params.T, sample_res.reshape(
             (self._p, self._kept_rank, -1)).T.swapaxes(0, 1).T, kernel=kernel, epsilon=epsilon)
