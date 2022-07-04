@@ -151,37 +151,6 @@ class KERDMD(DMD):
 
         return vh, s, s_inv
 
-    def predict(self, t, t1=0, method=0, rank=None, stabilize=True, init=None):
-        # ============================================
-        # ============================================
-        # Parameters
-        # ----------
-        # init : numpy.ndarray, size (N, )
-        #    initial condition in the first time instant of t (prediction timesteps)
-
-        # ============================================
-        # ============================================
-
-        if method != 3:
-            return super().predict(t, t1, method, rank, stabilize, init)
-
-        # ========= Method = 3 designed for Kernel DMD
-        # to predict using the Koopman operator
-        else:
-            if init is None:
-                init = self.init
-
-            # =============== Prediction using Koopman =====================
-            nt = len(t)
-            phi0 = self.koop_eigf(init[:, np.newaxis])[:, 0]  # Amplitudes
-            eigv = np.power(self.koop_eigv[:, np.newaxis], np.arange(
-                0, nt, 1))  # Dynamics (of shape (k, nt))
-
-            # Modes @ Amplitudes @ Dynamics
-            pred = np.linalg.multi_dot((self.dmd_modes, np.diag(phi0), eigv))
-
-            return pred
-
     @property
     def left_eigvectors(self):
         """Returns the left eigenvectors of the DMD operator.

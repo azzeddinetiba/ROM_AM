@@ -382,6 +382,16 @@ class DMD:
             # =========== where v are the pod coefficients of snapshots (i.e of size(rm, ))
             b, _, _, _ = np.linalg.lstsq(
                 L, (self.pod_coeff[:rank, :]).reshape((-1, 1), order='F').ravel(), rcond=None)
+        elif method == 3:
+            if initial is None:
+                init = self.init
+            else:
+                init = initial
+            try:
+                b = self.koop_eigf(init[:, np.newaxis])[:, 0]
+            except:
+                raise Exception(
+                    "The init argument should be an ndarray or None when 'method=3' is used")
         else:
             if initial is None:
                 # The default choice is using the first snapshot's POD coefficients
