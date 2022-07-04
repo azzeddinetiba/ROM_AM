@@ -25,7 +25,7 @@ class POD:
         self.modes = None
         self.time = None
 
-    def decompose(self, X, alg="svd", rank=0, opt_trunc=False, tikhonov=0):
+    def decompose(self, X, alg="svd", rank=0, opt_trunc=False, tikhonov=0, thin=False):
         """Computes the proper orthogonal decomposition, training the model on the input data X.
 
         Parameters
@@ -93,7 +93,10 @@ class POD:
                 rank = np.sum(s > tau)
             else:
                 if rank == 0:
-                    rank = len(s[s > 1e-10])
+                    if thin:
+                        rank = min_dim
+                    else:
+                        rank = len(s[s > 1e-10])
                 elif 0 < rank < 1:
                     rank = np.searchsorted(
                         np.cumsum(s**2 / (s**2).sum()), rank) + 1
@@ -122,7 +125,10 @@ class POD:
                 rank = np.sum(s > tau)
             else:
                 if rank == 0:
-                    rank = len(lambd[lambd > 1e-10])
+                    if thin:
+                        rank = min_dim
+                    else:
+                        rank = len(lambd[lambd > 1e-10])
                 elif 0 < rank < 1:
                     rank = np.searchsorted(
                         np.cumsum(s**2 / (s**2).sum()), rank) + 1
