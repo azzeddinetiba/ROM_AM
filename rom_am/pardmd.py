@@ -85,7 +85,7 @@ class ParDMD:
             self.x_cond = np.linalg.cond(self.stacked_X)
 
         self.params = params
-        self._k = params.shape[1]
+        self._k = params.shape[0]
 
         # POD Decomposition of the stacked X's POD coefficients
         self.pod_ = POD()
@@ -185,4 +185,4 @@ class ParDMD:
         f = RBFInterpolator(self.params.T, sample_res.reshape(
             (self._p, self._kept_rank, -1)).T.swapaxes(0, 1).T, kernel=kernel, epsilon=epsilon)
 
-        return self.pod_.modes @ f(mu).T[:, :, 0]
+        return self.pod_.modes @ f(mu.T)[0, :, :].T

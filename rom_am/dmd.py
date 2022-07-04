@@ -187,7 +187,7 @@ class DMD:
 
         return u, s, vh
 
-    def predict(self, t, t1=0, method=0, rank=None, stabilize=True, init=None):
+    def predict(self, t, t1=0, method=0, rank=None, stabilize=True, init=None, given_b=False, cutoff=1.):
         """Predict the DMD solution on the prescribed time instants.
 
         Parameters
@@ -247,18 +247,20 @@ class DMD:
 
         if rank is None:
             rank = self._kept_rank
-        elif not (isinstance(rank, int) and 0 < rank < self.kept_rank):
+        elif not (isinstance(rank, int) and 0 < rank < self._kept_rank):
             warnings.warn("The rank chosen for prediction should be an integer smaller than the "
                           "rank chosen/computed at the decomposition phase. Please see the rank value in self.kept_rank")
             rank = self._kept_rank
 
-        b = self._compute_amplitudes(method, rank=self.pred_rank, initial=init)
+        if not given_b:
+            b = self._compute_amplitudes(
+                method, rank=self.pred_rank, initial=init)
 
         eig = self.eigenvalues[:rank]
         if stabilize:
-            eig_rmpl = eig[np.abs(self.lambd[:rank]) > 1]
+            eig_rmpl = eig[np.abs(self.lambd[:rank]) > cutoff]
             eig_rmpl.real = 0
-            eig[np.abs(self.lambd[:rank]) > 1] = eig_rmpl
+            eig[np.abs(self.lambd[:rank]) > cutoff] = eig_rmpl
 
         self.t1 = t1
         if method == 0:
@@ -266,7 +268,7 @@ class DMD:
                 init = 0.
             t1 = self.t1 + init * self.dt
 
-        return self.dmd_modes[:, :rank] @ (np.exp(np.outer(eig, t-t1).T) * b[:rank]).T
+        return self.dmd_modes[:, :rank] @ (np.exp(np.outer(eig, t-t1).T) * self.computed_amplitudes[:rank]).T
 
     def reconstruct(self, rank=None):
         """Reconstruct the data input using the DMD Model.
@@ -390,6 +392,8 @@ class DMD:
                 raise Exception(
                     "init argument should be an int or None when 'method=0' is used")
             b = np.linalg.solve(self.lambd * self.low_dim_eig, alpha1)
+
+        self.computed_amplitudes = b
         return b
 
     @property
