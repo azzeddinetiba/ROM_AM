@@ -25,7 +25,7 @@ class POD:
         self.modes = None
         self.time = None
 
-    def decompose(self, X, alg="svd", rank=0, opt_trunc=False, tikhonov=0, thin=False):
+    def decompose(self, X, alg="svd", rank=None, opt_trunc=False, tikhonov=0, thin=False):
         """Computes the proper orthogonal decomposition, training the model on the input data X.
 
         Parameters
@@ -36,13 +36,13 @@ class POD:
             Whether to use the SVD on decomposition ("svd") or
             the eigenvalue problem on snaphot matrices ("snap")
             Default : "svd"
-        rank : int or float, optional
-            if rank = 0 All the ranks are kept, unless their
-            singular values are zero
+        rank : None, int or float, optional
+            if rank = 0 or rank is None All the ranks are kept, 
+            unless their singular values are zero
             if 0 < rank < 1, it is used as the percentage of
             the energy that should be kept, and the rank is
             computed accordingly
-            Default : 0
+            Default : None
         opt_trunc : bool, optional
             if True an optimal truncation/threshold is estimated,
             based on the algorithm of Gavish and Donoho [1]
@@ -64,15 +64,18 @@ class POD:
 
         """
         min_dim = min(X.shape[0], X.shape[1])
-        if rank < 0 or (rank > 1 and not isinstance(rank, int) and
-                        not isinstance(rank, np.int64) and
-                        not isinstance(rank, np.int32)):
-            raise ValueError("Invalid rank value, it should be an integer greater "
-                             "than 0 or a float between 0 and 1")
-        if rank > min_dim:
-            warnings.warn("The rank chosen for reconstruction should not be greater than "
-                          "the smallest data dimension m, the rank is now chosen as m")
+        if rank is None:
             rank = min_dim
+        else:
+            if rank < 0 or (rank > 1 and not isinstance(rank, int) and
+                            not isinstance(rank, np.int64) and
+                            not isinstance(rank, np.int32)):
+                raise ValueError("Invalid rank value, it should be an integer greater "
+                                "than 0 or a float between 0 and 1")
+            if rank > min_dim:
+                warnings.warn("The rank chosen for reconstruction should not be greater than "
+                            "the smallest data dimension m, the rank is now chosen as m")
+                rank = min_dim
 
         if alg == "svd":
             if os_ == 0:
@@ -92,7 +95,7 @@ class POD:
                 tau = np.median(s) * omega
                 rank = np.sum(s > tau)
             else:
-                if rank == 0:
+                if rank == 0 or rank == min_dim:
                     if thin:
                         rank = min_dim
                     else:
@@ -124,7 +127,7 @@ class POD:
                 tau = np.median(s) * omega
                 rank = np.sum(s > tau)
             else:
-                if rank == 0:
+                if rank == 0 or rank == min_dim:
                     if thin:
                         rank = min_dim
                     else:

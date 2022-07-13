@@ -13,7 +13,7 @@ class HODMD(DMD):
     def decompose(self,
                   X,
                   alg="svd",
-                  rank=0,
+                  rank=None,
                   opt_trunc=False,
                   tikhonov=0,
                   sorting="abs",
@@ -35,17 +35,20 @@ class HODMD(DMD):
 
         [1] S. Le Clainche and J. M. Vega. Higher order dynamic mode
         decomposition. SIAM Journal on Applied Dynamical Systems,
-        16(2):882–925, 2017
+        16(2):882-925, 2017
 
         """
-        if hod <= 0 or (not isinstance(rank, int) and not isinstance(rank, np.int64)):
+        if hod <= 0 or (not isinstance(hod, int) and not isinstance(hod, np.int64)):
             raise ValueError("Invalid 'hod' value, it should be an integer greater "
                              "than 0")
         if hod > X.shape[1]:
             raise ValueError("Invalid 'hod' value, it cannot be greater than the number "
                              "of snapshots")
-        if hod <= X.shape[1] and ((X.shape[1]+1-hod) < 0.01 * (rank*hod)):
-            warnings.warn("The 'd' value is too close to the number of snapshots, "
+        r = rank
+        if rank is None:
+            r = min(X.shape[0], X.shape[1])
+        if hod <= X.shape[1] and ((X.shape[1]+1-hod) < 0.01 * (r*hod)):
+            warnings.warn("The 'd' (hod) value is too close to the number of snapshots, "
                           "it does not enable the modified snapshot matrix to have "
                           "enough snapshots, the results may be erroneous ")
 
@@ -80,7 +83,7 @@ class HODMD(DMD):
         ho_Y = ho_X_[:, 1::]
         _, _, _ = super().decompose(ho_X,
                                     alg=alg,
-                                    rank=0,
+                                    rank=None,
                                     opt_trunc=opt_trunc,
                                     tikhonov=0,
                                     sorting=sorting,

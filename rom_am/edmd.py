@@ -15,7 +15,7 @@ class EDMD(DMD):
         self._accuracy = None
         self.tall = False
 
-    def decompose(self, X, alg="svd", rank=0, opt_trunc=False, tikhonov=0, sorting="abs", Y=None, dt=None, observables=None):
+    def decompose(self, X, alg="svd", rank=None, opt_trunc=False, tikhonov=0, sorting="abs", Y=None, dt=None, observables=None):
         """Training the extended dynamic mode decomposition[1, 3] model, using the input data X and Y
             Cases where the number of timesteps is much bigger than the number of observables
             considered.
@@ -34,13 +34,13 @@ class EDMD(DMD):
             Whether to use the SVD on decomposition ("svd") or
             the eigenvalue problem on snaphot matrices ("snap")
             Default : "svd"
-        rank : int or float, optional
+        rank : None, int or float, optional
             if rank = 0 All the ranks are kept, unless their
             singular values are zero
             if 0 < rank < 1, it is used as the percentage of
             the energy that should be kept, and the rank is
             computed accordingly
-            Default : 0
+            Default : None
         opt_trunc : bool, optional
             if True an optimal truncation/threshold is estimated,
             based on the algorithm of Gavish and Donoho [2]

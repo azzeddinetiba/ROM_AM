@@ -28,7 +28,7 @@ class DMDc:
     def decompose(self,
                   X,
                   alg="svd",
-                  rank=0,
+                  rank=None,
                   opt_trunc=False,
                   tikhonov=0,
                   sorting="abs",
@@ -52,13 +52,13 @@ class DMDc:
             Whether to use the SVD on decomposition ("svd") or
             the eigenvalue problem on snaphot matrices ("snap")
             Default : "svd"
-        rank : int or float, optional
+        rank : None, int or float, optional
             if rank = 0 All the ranks are kept, unless their
             singular values are zero
             if 0 < rank < 1, it is used as the percentage of
             the energy that should be kept, and the rank is
             computed accordingly
-            Default : 0
+            Default : None
         opt_trunc : bool, optional
             if True an optimal truncation/threshold is estimated,
             based on the algorithm of Gavish and Donoho [2]

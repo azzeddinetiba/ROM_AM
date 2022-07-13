@@ -49,7 +49,7 @@ class CnvxDMD:
                 t1,
                 rank_pred=None,
                 alg="svd",
-                rank=0,
+                rank=None,
                 opt_trunc=False,
                 tikhonov=0,
                 sorting="abs",
@@ -73,12 +73,9 @@ class CnvxDMD:
             If 'method=1' is used and t1 indicates the time isntant 
             when the solution corresponds to 'init'
             Default 0.
-        rank: int or None
-            ranks kept for prediction: it should be a hard threshold integer
-            and greater than the rank chose/computed in the decomposition
-            phase. If None, the same rank already computed is used
-            if rank = 0 All the ranks are kept, unless their
-            singular values are zero
+        rank : None, int or float, optional
+            if rank = 0 or rank is None All the ranks are kept, 
+            unless their singular values are zero
             if 0 < rank < 1, it is used as the percentage of
             the energy that should be kept, and the rank is
             computed accordingly

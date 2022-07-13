@@ -49,7 +49,7 @@ class KERDMDC:
 
     def decompose(self, X,
                   alg="snap",
-                  rank=0,
+                  rank=None,
                   opt_trunc=False,
                   tikhonov=0,
                   sorting="abs",
@@ -197,11 +197,14 @@ class KERDMDC:
             tau = np.median(s) * omega
             rank = np.sum(s > tau)
         else:
-            if rank == 0:
+            if rank is None:
                 rank = len(vals[vals > 1e-10])
-            elif 0 < rank < 1:
-                rank = np.searchsorted(
-                    np.cumsum(s**2 / (s**2).sum()), rank) + 1
+            else:
+                if rank == 0:
+                    rank = len(vals[vals > 1e-10])
+                elif 0 < rank < 1:
+                    rank = np.searchsorted(
+                        np.cumsum(s**2 / (s**2).sum()), rank) + 1
 
         s = s[:rank]
         s_inv = np.zeros(s.shape)

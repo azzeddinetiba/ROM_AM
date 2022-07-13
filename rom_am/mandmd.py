@@ -51,13 +51,12 @@ class ManDMD:
                   X,
                   params,
                   alg="svd",
-                  rank=0,
+                  rank=None,
                   opt_trunc=False,
                   tikhonov=0,
                   sorting="abs",
                   dt=None,
                   dmd_model="dmd",
-                  hod=50,
                   kernel='thin_plate_spline',
                   epsilon=None,
                   iref=0,
@@ -79,20 +78,13 @@ class ManDMD:
             Whether to use the SVD on decomposition ("svd") or
             the eigenvalue problem on snaphot matrices ("snap")
             Default : "svd"
-        rank1 : int or float, optional
-            if rank1 = 0 All the ranks are kept, unless their
-            singular values are zero
+        rank : None, int or float, optional
+            if rank = 0 or rank is None All the ranks are kept, 
+            unless their singular values are zero
             if 0 < rank < 1, it is used as the percentage of
             the energy that should be kept, and the rank is
             computed accordingly
-            Default : 0
-        rank2 : int or float, optional
-            if rank = 0 All the ranks are kept, unless their
-            singular values are zero
-            if 0 < rank < 1, it is used as the percentage of
-            the energy that should be kept, and the rank is
-            computed accordingly
-            Default : 0
+            Default : None
         opt_trunc : bool, optional
             if True an optimal truncation/threshold is estimated,
             based on the algorithm of Gavish and Donoho [2]
