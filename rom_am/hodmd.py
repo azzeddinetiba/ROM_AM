@@ -110,7 +110,11 @@ class HODMD(DMD):
             method = 2
             warnings.warn(
                 "The method 2 is the only one suppported for HoDMD, It will be used here.")
-        return super().predict(t=t, t1=t1, method=method, rank=rank, stabilize=stabilize)
+        # ==== Here, t1 = t1 - dt because in HODMD, the high dimensional DMD modes
+        # are computed using phi = U W, meaning 'method = 2' is used in a natural way
+        # i.e t1 corresponds to the initial time instant. (See super().predict() for more details)
+        # ======================================================================================
+        return super().predict(t=t, t1=t1-self.dt, method=method, rank=rank, stabilize=stabilize)
 
     @property
     def A(self):

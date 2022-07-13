@@ -164,7 +164,7 @@ class DMD:
 
             # Computing the high-dimensional DMD modes [1]
             phi = store @ w
-        else:  # Should ONLY be used in the context of parametric DMD
+        else:  # Should ONLY be used in the context of very low dimensional data
             self._no_reduction = True
             self._A = Y @ np.linalg.pinv(X)
             lambd, phi = np.linalg.eig(self._A)
@@ -196,7 +196,7 @@ class DMD:
             time steps at which the DMD solution will be computed
         t1: float
             the value of the time instant of the first data snapshot
-            If 'method=1' is used and t1 indicates the time instant 
+            If 'method=1' is used, t1 indicates the time instant 
             when the solution corresponds to 'init'
         rank: int or None
             ranks kept for prediction: it should be a hard threshold integer
@@ -228,6 +228,7 @@ class DMD:
                 to be prescribed accordingly).
                 - None, then the first data snapshot will be used
                 whether in 'method = 0' or 'method = 1'
+                - Disregarded when used with 'method = 3'
             Default None
         References
         ----------
@@ -267,6 +268,18 @@ class DMD:
             if init is None:
                 init = 0.
             t1 = self.t1 + init * self.dt
+        # ================================================================
+        # When using method = 2, the low dimensional DMD modes W
+        # were used for the amplitudes computations (least square problem)
+        # The High dimensional DMD modes however are the one used for the
+        # final prediction computation. Those DMD modes are computed here
+        # using (exact modes) phi = Y @ V @ (1/Sig) @ W and not (projected
+        # modes) phi = U @ W, so the high-dimensional DMD modes are mapped
+        # to the Y range and not the X range, so we have to adjust the
+        # initial time instant value to be the second instant value.
+        # ================================================================
+        if method == 2:
+            t1 = self.t1 + self.dt
 
         return self.dmd_modes[:, :rank] @ (np.exp(np.outer(eig, t-t1).T) * self.computed_amplitudes[:rank]).T
 
@@ -373,11 +386,12 @@ class DMD:
 
             # ======= The L matrix contains [W; WΛ; WΛ**2; ... ; WΛ**(m-1)]
             # ======== Meaning L is of size (rm x r)
-            L = self.low_dim_eig[:rank, :] @ np.tile(np.eye(len(self.lambd)), n_steps) * \
+            n_modes = len(self.lambd)
+            L = self.low_dim_eig[:rank, :] @ np.tile(np.eye(n_modes), n_steps) * \
                 np.tile(self.lambd, n_steps)**np.repeat(
-                np.linspace(1, n_steps, n_steps, dtype=int), len(self.lambd))
+                np.linspace(1, n_steps, n_steps, dtype=int), n_modes)
             L = np.vstack((self.low_dim_eig[:rank, :], L.reshape(
-                rank, -1, len(self.lambd)).swapaxes(0, 1).reshape((-1, len(self.lambd)))))
+                rank, -1, n_modes).swapaxes(0, 1).reshape((-1, n_modes))))
             # ========== Solving the lstsq system L b = v
             # =========== where v are the pod coefficients of snapshots (i.e of size(rm, ))
             b, _, _, _ = np.linalg.lstsq(
