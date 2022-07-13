@@ -5,6 +5,10 @@ from scipy.optimize import nnls
 
 
 class CnvxDMD:
+    """
+    Parametric Dynamic Mode Decomposition with Convex hull reconstructions [1]
+
+    """
 
     def __init__(self):
         pass
@@ -24,6 +28,16 @@ class CnvxDMD:
             Parameters in a (k, p) array
         dt : float
             value of time step from each column in X to the next column
+
+        References
+        ----------
+
+        [1] Claire Dupont, Florian De Vuyst and Anne-Virginie Salsac, 
+        Reduced-order model of deformable microcapsules in a Stokes 
+        flow: presentation of a non-intrusive kinematics-consistent 
+        data-driven approach, Journal of Fluid Mechanics 
+        (JFM), 2nd revision (2022).
+
         """
 
         self._p = X.shape[0]  # Number of parameters samples
@@ -135,6 +149,7 @@ class CnvxDMD:
         ----------
             numpy.ndarray, size (N, nt)
             parDMD solution on the time values t and parameter value mu
+
         """
 
         if k is None:
@@ -155,6 +170,32 @@ class CnvxDMD:
         return dmd_model.predict(t, t1=t1, method=method, rank=rank_pred, stabilize=stabilize, init=init, cutoff=cutoff)
 
     def cnvx_nnls(self, z, Z, ksi=1e5, mu=None):
+        """Solving a non negative linear square problem
+        min || Z w - z ||
+        with the constraint of w_i > 1 for all i
+        This uses scipy.optimize 's nnls function
+
+        Parameters
+        ----------
+        z : numpy.ndarray
+            Right hand vector, of shape (k, 1)
+        Z : numpy.ndarray
+            Matrix Z as shown above, of shape (k, p)
+        mu: float
+            Value of Penalization parameter ksi_ to enforce \Sum w_i = 1 
+            where ksi_ = ksi * tr(Z.T Z)/dim(w)
+            Default : 1e5
+        mu: None or float
+            Value of Tikhonov regularization parameter, thus solving 
+            min || Z w - z || + lambda || w ||
+            where lambda = mu * tr(Z.T Z)/dim(w)
+            Default : None
+        Returns
+        ----------
+        w : numpy.ndarray, size (p, )
+            solution of the constrained nnls problem
+
+        """
 
         k = Z.shape[1]
         ksi_ = ksi * np.trace(Z.T @ Z)/k
