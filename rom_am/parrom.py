@@ -39,10 +39,6 @@ class ParROM:
     def decompose(self,
                   X,
                   params,
-                  alg="svd",
-                  rank=0,
-                  opt_trunc=False,
-                  tikhonov=0,
                   center=False,
                   normalize=False,
                   normalization="norm",
@@ -67,11 +63,6 @@ class ParROM:
         t0 = time.time()
         u, s, vh = self.model.decompose(X=self.snapshots,
                                         params=self.params,
-                                        alg=alg,
-                                        rank=rank,
-                                        opt_trunc=opt_trunc,
-                                        tikhonov=tikhonov,
-                                        sorting="abs",
                                         *args,
                                         **kwargs,)
 
