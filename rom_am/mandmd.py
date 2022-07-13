@@ -208,7 +208,6 @@ class ManDMD:
         dmd_pred = DMD()
         self.load_DMD(dmd_pred, U_pred, A_pred, init, b, phi)
 
-        self.dpd = dmd_pred
         if method == 0:
             raise NotImplementedError
         if method == 1:
