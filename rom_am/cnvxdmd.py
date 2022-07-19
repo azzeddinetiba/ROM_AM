@@ -159,7 +159,6 @@ class CnvxDMD:
         new_snaps = self.data[ii, :, :]
 
         weights = self.cnvx_nnls(mu, self.params[:, ii], mu=nnls_tikhonov)
-
         weighted_snaps = np.dot(new_snaps.T, weights).T
 
         # DMD Decomposition
