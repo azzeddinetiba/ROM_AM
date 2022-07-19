@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.interpolate import RBFInterpolator
+from scipy.spatial import KDTree
 from .pod import POD
 from .dmd import DMD
 from .hodmd import HODMD
@@ -72,6 +72,8 @@ class KnnDMD:
         self._N = X.shape[1]  # Number of dofs
         self._m = X.shape[2]  # Number of timesteps
 
+        self.param_tree = KDTree(params.T)
+
         self.stacked_X = X.swapaxes(0, 2).swapaxes(
             0, 1).reshape((self._N, self._m*self._p), order='F')  # of size (N, m * p)
         self.tikhonov = tikhonov
@@ -99,7 +101,7 @@ class KnnDMD:
 
         return tmp_model.modes, tmp_model.singvals, tmp_model.time
 
-    def predict(self, t, mu, t1, rank=None, stabilize=False, init=None, method=0):
+    def predict(self, t, mu, t1, rank=None, stabilize=False, init=None, method=0, k=None):
         """Predict the knndmd solution on the prescribed time instants and 
         the target aprameter value.
 
@@ -130,7 +132,7 @@ class KnnDMD:
 
         _, ii = self.param_tree.query(mu.ravel(), k=k)
 
-        weights = np.linalg.norm(mu - self.params[ii, :], axis=0)
+        weights = np.linalg.norm(mu - self.params[:, ii], axis=0)
         weights /= weights.sum()
 
         sample_res = np.empty(
