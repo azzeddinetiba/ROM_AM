@@ -11,3 +11,4 @@ from .kerdmdc import KERDMDC
 from .mandmd import ManDMD
 from .cnvxdmd import CnvxDMD
 from .knndmd import KnnDMD
+from .gpardmd import GParDMD
