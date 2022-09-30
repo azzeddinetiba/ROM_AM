@@ -48,36 +48,3 @@ def test_dmdc_discr_pred():
     predicted_X = np.real(dmdc.predict(
         t, t1=t[0], u_input=np.ones((1, t.shape[0]))))
     assert np.allclose(X1, predicted_X)
-
-
-# ----------------- Testing Continuous prediction ---------------------
-X2 = np.zeros((2, 40))
-Y2 = np.zeros((2, 40))
-X2[:, 0] = np.array([4, 7])
-u2 = np.ones((1, 40))
-
-A2 = np.array([[0.60653066, 0.],
-               [0., 0.90483742]])
-B2 = np.array([-0.01180408,  0.])
-Y2[:, 0] = A2 @ X2[:, 0] + B2.ravel() * u2[:, 0]
-for i in range(Y2.shape[1]-1):
-    Y2[:, i+1] = A2 @ Y2[:, i] + B2.ravel() * u2[:, i]
-X2[:, 1::] = Y2[:, :-1]
-
-# DMDc training
-sample_dt = 0.05
-dmdc2 = DMDc()
-dmdc2.decompose(X2,  Y=Y2, dt=sample_dt, Y_input=u2)
-
-# DMDc prediction
-t = np.arange(0, X2.shape[1] * sample_dt, sample_dt)
-
-
-def test_dmdc_cont_pred():
-    t_pred = np.arange(0, 2*t[-1], sample_dt)
-    predicted_X = np.real(dmdc2.predict(t_pred, t1=t[0], u_input=np.ones(
-        (1, t_pred.shape[0])), fixed_input=True, method=1))
-    predicted_X_1 = np.real(dmdc2.predict(
-        t_pred, t1=t[0], u_input=np.ones((1, t_pred.shape[0]))))
-    assert np.allclose(predicted_X[1, :], predicted_X_1[1, :-1]
-                       ) and np.allclose(predicted_X[1, :40], X2[1, :])

@@ -159,6 +159,7 @@ class DMDc:
         self.modes = u
         self.time = vh_hat
         self.u_hat = u_hat
+        self.dt = dt
 
         return u, s, vh
 
@@ -204,41 +205,18 @@ class DMDc:
             rank = self._kept_rank
 
         init = self.init
-        if not fixed_input:
-            if x_input is not None:
-                return self.u_hat @ (self.A_tilde @ self.u_hat.T @ x_input
-                                     + self.B_tilde @ u_input)
-            else:
-                data = np.zeros(
-                    (rank, u_input.shape[1]+1), dtype=complex)
-                data[:, 0] = self.u_hat[:, :rank].T @ init
-                for i in range(u_input.shape[1]):
-                    data[:, i+1] = self.A_tilde[:rank, :rank] @ data[:,
-                                                                     i][:rank] + self.B_tilde[:rank, :] @ u_input[:, i]
-                data = self.u_hat[:, :rank] @ data
-                return data
+        if x_input is not None:
+            return self.u_hat @ (self.A_tilde @ self.u_hat.T @ x_input
+                                 + self.B_tilde @ u_input)
         else:
-
-            temp, _, _, _ = np.linalg.lstsq(
-                self.dmd_modes[:, :rank], self.u_hat[:, :rank] @ self.B_tilde[:rank, :], rcond=None)
-            self.control_component = temp
-
-            eig = self.eigenvalues[:rank]
-            if stabilize:
-                eig_rmpl = eig[np.abs(self.lambd[:rank]) > 1]
-                eig_rmpl.real = 0
-                eig[np.abs(self.lambd[:rank]) > 1] = eig_rmpl
-
-            if method:
-                init = self.init
-                b, _, _, _ = np.linalg.lstsq(self.dmd_modes, init, rcond=None)
-            else:
-                alpha1 = self.singvals[:rank] * self.time[:rank, 0]
-                b = np.linalg.solve(
-                    self.lambd[:rank] * self.low_dim_eig[:rank, :rank], alpha1)
-
-            return self.dmd_modes[:, :rank] @ ((np.exp(np.outer(eig, (t-t1)).T) * b).T
-                                               - (self.control_component @ u_input[:, 0] / eig)[:, np.newaxis])
+            data = np.zeros(
+                (rank, u_input.shape[1]+1), dtype=complex)
+            data[:, 0] = self.u_hat[:, :rank].T @ init
+            for i in range(u_input.shape[1]):
+                data[:, i+1] = self.A_tilde[:rank, :rank] @ data[:,
+                                                                 i][:rank] + self.B_tilde[:rank, :] @ u_input[:, i]
+            data = self.u_hat[:, :rank] @ data
+            return data
 
     def reconstruct(self, rank=None):
         return self.predict(0, rank=rank, x_input=self._train_data, u_input=self._train_input)
