@@ -136,7 +136,6 @@ References/*/*.h5
 References/*/*.vtk
 
 DATA/*/*.npy
-DATA/*/*/*.npy
 /Figures/*
 /examples/fsi_test_case figures.ipynb
 DATA/*/*.csv
