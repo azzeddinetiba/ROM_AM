@@ -24,6 +24,7 @@ class POD:
         self.singvals = None
         self.modes = None
         self.time = None
+        self._pod_coeff = None
 
     def decompose(self, X, alg="svd", rank=None, opt_trunc=False, tikhonov=0, thin=False):
         """Computes the proper orthogonal decomposition, training the model on the input data X.
@@ -71,10 +72,10 @@ class POD:
                             not isinstance(rank, np.int64) and
                             not isinstance(rank, np.int32)):
                 raise ValueError("Invalid rank value, it should be an integer greater "
-                                "than 0 or a float between 0 and 1")
+                                 "than 0 or a float between 0 and 1")
             if rank > min_dim:
                 warnings.warn("The rank chosen for reconstruction should not be greater than "
-                            "the smallest data dimension m, the rank is now chosen as m")
+                              "the smallest data dimension m, the rank is now chosen as m")
                 rank = min_dim
 
         if alg == "svd":
@@ -179,3 +180,40 @@ class POD:
             rank = self.kept_rank
 
         return (self.modes[:, :rank] * self.singvals[:rank]) @ self.time[:rank, :]
+
+    def project(self, new_data):
+        """Project new high-dimensional data on the POD subspace
+
+        Parameters
+        ----------
+        new_data: numpy.ndarray
+            New matrix data, of (N, m) size
+
+        Returns
+        ----------
+            numpy.ndarray, size (r, m)
+            POD projection on the r-dimensional (r=kept_rank) POD subspace
+        """
+        return self.modes.T @ new_data
+
+    def inverse_project(self, new_reduced_data):
+        """Project new high-dimensional data on the POD subspace
+
+        Parameters
+        ----------
+        new_data: numpy.ndarray
+            New matrix data, of (r, m) size
+
+        Returns
+        ----------
+            numpy.ndarray, size (r, m)
+            POD projection on the r-dimensional (r=kept_rank) POD subspace
+        """
+        return self.modes @ new_reduced_data
+
+    @property
+    def pod_coeff(self):
+
+        if self._pod_coeff is None:
+            self._pod_coeff = np.diag(self.singvals) @ self.time
+        return self._pod_coeff
