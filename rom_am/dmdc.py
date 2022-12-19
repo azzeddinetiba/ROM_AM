@@ -163,7 +163,7 @@ class DMDc:
 
         return u, s, vh
 
-    def predict(self, t, t1=0, rank=None, x_input=None, u_input=None, fixed_input=False, stabilize=True, method=0):
+    def predict(self, t, t1=0, rank=None, x_input=None, u_input=None, fixed_input=False, stabilize=True, method=0, init=None):
         """Predict the DMD solution on the prescribed time instants.
 
         Parameters
@@ -195,6 +195,10 @@ class DMDc:
             0 if it is computed on the POD subspace as in Tu et al.[1]
             1 if it is computed using the pseudoinverse of the DMD modes
             Default : 0
+        initi: ndarray or None
+            (N, ) array indicating the initial state for the prediction regime.
+            None value assumes the initial state is the same initial state used for training.
+            Default : None
 
         Returns
         ----------
@@ -204,7 +208,8 @@ class DMDc:
         if rank is None:
             rank = self._kept_rank
 
-        init = self.init
+        if init is None:
+            init = self.init
         if x_input is not None:
             return self.u_hat @ (self.A_tilde @ self.u_hat.T @ x_input
                                  + self.B_tilde @ u_input)
