@@ -104,7 +104,6 @@ class POD:
                 elif 0 < rank < 1:
                     rank = np.searchsorted(
                         np.cumsum(s**2 / (s**2).sum()), rank) + 1
-            self.kept_rank = rank
 
             u = u[:, :rank]
             vh = vh[:rank, :]
@@ -144,6 +143,8 @@ class POD:
             vh = v.T
 
             u = X @ v[:, :rank] * s_inv
+
+        self.kept_rank = rank
 
         self.singvals = s
         self.modes = u
