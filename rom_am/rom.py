@@ -10,7 +10,7 @@ class ROM:
 
     Parameters
     ----------
-    rom_object : python class
+    rom_object : python object, string
         an instance of a class that represents a method for reduced
         order modeling it has to have the methods decompose(),
         reconstruct() and predict()
@@ -19,11 +19,21 @@ class ROM:
         the {X, alg, rank, opt_trunc, tikhonov} arguments, the predict()
         has to take at least {t, t1, rank} and {rank} for reconstruct
 
+        If string, the argument refers to the file path where a previous ROM
+        object is saved.
+
     """
 
     def __init__(self, rom_object):
 
-        self.model = rom_object
+        if isinstance(rom_object, str):
+            import pickle
+
+            with open(rom_object, 'rb') as inp:
+                self.__dict__.update(pickle.load(inp).__dict__)
+
+        else:
+            self.model = rom_object
         self.snapshots = None
         self.singvals = None
         self.modes = None
@@ -364,3 +374,22 @@ class ROM:
             err = np.linalg.norm(self.predict(
                 t=t, rank=rank, t1=t1) - ref, axis=0)/np.linalg.norm(ref, axis=0)
             return err.sum()/err.shape[0]
+
+    def save_model(self, file_name):
+        """Saves the ROM() object in a file.
+
+        Parameters
+        ----------
+        file_name: String
+            The file path where the object is saved. We recommend using '.pkl'
+            extension
+
+        Returns
+        ----------
+
+        """
+
+        import pickle
+        with open(file_name, 'wb') as outp:
+
+            pickle.dump(self, outp, pickle.HIGHEST_PROTOCOL)
