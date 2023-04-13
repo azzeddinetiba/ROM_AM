@@ -187,9 +187,9 @@ class ROM:
         res = self.model.predict(t=t, t1=t1, rank=rank, *args, **kwargs)
         t1 = time.time()
         if self.normalize:
-            res = self._denormalize(res)
+            res = self.denormalize(res)
         if self.center:
-            res = self._decenter(res)
+            res = self.decenter(res)
         self.profile["Prediction time"] = t1-t0
         return res
 
@@ -210,6 +210,22 @@ class ROM:
             ROM solution on the time steps where the input snapshots are taken
         """
         return self.model.reconstruct(rank=rank)
+
+    def normalize(self, data):
+        """normalization of input data
+
+        """
+        try:
+            if self.normalization == "minmax":
+                return (data - self.snap_min[:, np.newaxis]) / self.max_min
+            elif self.normalization == "norm":
+                return data / self.snap_norms[:, np.newaxis]
+            if self.Y is not None or self.Y_input is not None or self.normalization == "spec":
+                raise NotImplementedError(
+                    "normalize() is only supported for 'minmax' and 'norm' normalizations, and only when one set of \
+                        snapshot data matrices is considered. Consider using self.snap_norms attributes")
+        except AttributeError:
+            return data
 
     def _normalize(self, Y=None):
         """normalization of the input snapshots
@@ -269,7 +285,7 @@ class ROM:
                 np.repeat(self.norm_info[:, 0], self.norm_info[:, 1].astype(int))[
                     :, np.newaxis]
 
-    def _denormalize(self, res):
+    def denormalize(self, res):
         """denormalization of the input array
 
         Parameters
@@ -293,6 +309,15 @@ class ROM:
             return res * np.repeat(self.norm_info[:, 0], self.norm_info[:, 1].astype(int))[
                 :, np.newaxis]
 
+    def center(self, data):
+        """Center the data along time
+
+        """
+        try:
+            return data - self.mean_flow.reshape((-1, 1))
+        except AttributeError:
+            return data
+
     def _center(self,):
         """Center the data along time
 
@@ -302,10 +327,11 @@ class ROM:
         else:
             self.mean_flow = np.hstack(
                 (self.snapshots, self.Y[:, -1].reshape((-1, 1)))).mean(axis=1)
-            self.Y -= self.mean_flow.reshape((-1, 1))
-        self.snapshots -= self.mean_flow.reshape((-1, 1))
+            self.Y = self.center(self.Y)
 
-    def _decenter(self, res):
+        self.snapshots = self.center(self.snapshots)
+
+    def decenter(self, res):
         """Decenter the data on the input array
 
         Parameters
