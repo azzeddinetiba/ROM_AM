@@ -5,12 +5,13 @@ import sys
 import warnings
 from scipy.linalg import lstsq
 
-class QUAD_MAN:
+
+class QUAD_MAN(POD):
     """
     Data-driven quadratic manifold class
     """
 
-    def __init__(self, snapshot, points_absciss, points_ordinate, s_ref):
+    def __init__(self):
         """
         Initialisation function of POD class
 
@@ -25,7 +26,7 @@ class QUAD_MAN:
         :returns: Instantiate a POD caller
         """
 
-        self._snapshot_ref = s_ref
+        super().__init__()
         self._n_mode = None
         self.Vr = None
         self._exp_var = None
@@ -40,17 +41,82 @@ class QUAD_MAN:
         self.variance_linear = None
         self.variance_quad = None
         self.s_pod = None
-        self._snapshot = snapshot
 
     def _kron_x_sq(self, Xmat):
-        w = Xmat.shape[1]
+        w = Xmat.T.shape[1]
         Xi = []
         for j in range(w):
-            Xi.append(np.tile(Xmat[:, j].reshape(-1, 1), (1, w - (j + 1) + 1)) * Xmat[:, j:w])
+            Xi.append(np.tile(Xmat.T[:, j].reshape(-1, 1),
+                      (1, w - (j + 1) + 1)) * Xmat.T[:, j:w])
 
         X2 = np.concatenate(Xi[:], axis=1)
 
-        return X2
+        return X2.T
+
+    def decompose(self, X, alg="svd", rank=None, opt_trunc=False, tikhonov=0, thin=False,
+                  column_selection=False, lbda=0, lbda_col=0.5, alpha0=0.01):
+        """
+        Compute decomposition method of Quad_Manifold class
+
+        :param min_exp_var: minimum cumulative explained energy required
+        :type min_exp_var: float
+        :param keepmode: choice of nb of modes that should be kept
+        :type keepmode:
+        :param energy_plot: plot the explained variance by all POD modes
+        :type energy_plot: bool
+
+        :returns: None
+        :rtype: None
+        """
+
+        u, s, vh = super().decompose(X, alg, rank, opt_trunc, tikhonov, thin)
+
+        self._snapshot_reduce = super().project(X)
+        self._snapshot_reconstruct_linear = self.reconstruct()
+        self.err = X - self._snapshot_reconstruct_linear
+
+        # Compute the Kronecker product without redundancy
+        self.W = self._kron_x_sq(self._snapshot_reduce)
+
+        if column_selection:
+            VbarTinit = np.zeros((self.W.T.shape[1], self.err.T.shape[1]))
+            columns, _, _, _ = self._column_selection(
+                self.W.T, self.err.T, VbarTinit, lbda_col, alpha0)
+            self.columns = columns
+            print("Colonnes retenues: ", columns)
+            self.Wtilde = self.W[columns, :]
+        else:
+            self.columns = np.arange(0, self.W.shape[0], 1).astype(int)
+            self.Wtilde = self.W
+
+        q = self.err.shape[0]
+        p = self.Wtilde.shape[0]
+        Aplus = np.concatenate(
+            (self.Wtilde.T, np.sqrt(lbda) * np.eye(p)), axis=0)
+        bplus = np.concatenate((self.err.T, np.zeros((p, q))), axis=0)
+        self.Vbar = lstsq(Aplus, bplus)[0].T
+
+        self._snapshot_reconstruct_quad = self._snapshot_reconstruct_linear + \
+            self.Vbar @ self.Wtilde
+
+        # Compute error
+        err = np.linalg.norm(self._snapshot_reconstruct_linear - X, ord='fro') / np.linalg.norm(X,
+                                                                                                ord='fro')
+        err_quad = np.linalg.norm(self._snapshot_reconstruct_quad - X, ord='fro') / np.linalg.norm(
+            X, ord='fro')
+        print("Reconstruction error linear basis: ", err)
+        print("Reconstruction error quadratic manifold: ", err_quad)
+
+        return u, s, vh
+
+    def inverse_project(self, new_reduced_data):
+
+        return super().inverse_project(new_reduced_data) + self.Vbar @ self._kron_x_sq(new_reduced_data)
+
+    def project(self, new_data):
+
+        reduced_linear = super().project(new_data)
+        return np.vstack((reduced_linear, self._kron_x_sq(reduced_linear)))
 
     def _column_selection(self, WT, EpsT, VbarT, lbda, alpha0):
 
@@ -89,7 +155,8 @@ class QUAD_MAN:
                 Temp = WT @ VnewT - EpsT
                 Fval_new = 0.5 * np.trace(Temp.T @ Temp)
                 for i in range(r2):
-                    Fval_new = Fval_new + lbda * np.linalg.norm(VnewT[i, :], ord=2)
+                    Fval_new = Fval_new + lbda * \
+                        np.linalg.norm(VnewT[i, :], ord=2)
                 if Fval_new < Fval:
                     print("Success with alpha= ", alpha)
                     break
@@ -120,87 +187,6 @@ class QUAD_MAN:
 
         return columns, VbarT, alpha, flag
 
-    def compute_decomposition(
-            self,
-            min_exp_var=0.99,
-            keepmode=3,
-            column_selection=False, lbda=0, lbda_col=0.5, alpha0=0.01):
-
-        """
-        Compute decomposition method of Quad_Manifold class
-
-        :param min_exp_var: minimum cumulative explained energy required
-        :type min_exp_var: float
-        :param keepmode: choice of nb of modes that should be kept
-        :type keepmode:
-        :param energy_plot: plot the explained variance by all POD modes
-        :type energy_plot: bool
-
-        :returns: None
-        :rtype: None
-        """
-
-        # Find the POD basis : left singular vectors
-        # U, Sigma, Vtranspose = svd(self._snapshot - self._snapshot_ref, full_matrices=False)
-        #
-        # cum_exp_var = np.cumsum(Sigma) / np.sum(Sigma)
-        # self._exp_var = Sigma / np.sum(Sigma)
-        # n_mode_var_exp = np.where(cum_exp_var > min_exp_var)[0][0] + 1
-        # if keepmode == "exp_ener":
-        #     self._n_mode = n_mode_var_exp
-        # else:
-        #     self._n_mode = keepmode
-        # Vr_ref = U[:, :self._n_mode]
-
-        s_pod = POD()
-        s_pod.decompose((self._snapshot - self._snapshot_ref), rank = keepmode)
-        self.s_pod = s_pod
-
-        self._n_mode = self.s_pod.kept_rank
-        # Un jour il faudrait quand même qu'on recode la classe POD en transposant la matrice de snapshot parce que
-        # là on fait l'inverse de la littérature c'est quand même confusant
-        self.Vr = self.s_pod.modes.copy()
-
-        self._snapshot_reduce = self.Vr.T @ (self._snapshot - self._snapshot_ref)
-        self._snapshot_reconstruct_linear = self._snapshot_ref + self.Vr @ self._snapshot_reduce
-
-        self.err = self._snapshot - self._snapshot_ref - self.Vr @ self._snapshot_reduce
-        # Compute the Kronecker product without redundancy
-        self.W = self._kron_x_sq(self._snapshot_reduce.T).T
-        if column_selection:
-            VbarTinit = np.zeros((self.W.T.shape[1], self.err.T.shape[1]))
-            columns, VbarT, alpha, flag = self._column_selection(self.W.T, self.err.T, VbarTinit, lbda_col, alpha0)
-            self.columns = columns
-            print("Colonnes retenues: ", columns)
-            self.Wtilde = self.W[columns, :]
-        else:
-            self.columns = np.arange(0, self.W.shape[0], 1).astype(int)
-            self.Wtilde = self.W
-
-        q = self.err.shape[0]
-        p = self.Wtilde.shape[0]
-        Aplus = np.concatenate((self.Wtilde.T, np.sqrt(lbda) * np.eye(p)), axis=0)
-        bplus = np.concatenate((self.err.T, np.zeros((p, q))), axis=0)
-        self.Vbar = lstsq(Aplus, bplus)[0].T
-
-        self._snapshot_reconstruct_quad = self._snapshot_ref + self.Vr @ self._snapshot_reduce + \
-                                          self.Vbar @ self.Wtilde
-
-        # Compute error
-        err = np.linalg.norm(self._snapshot_reconstruct_linear - self._snapshot, ord='fro') / np.linalg.norm(self._snapshot,
-                                                                                                   ord='fro')
-        err_quad = np.linalg.norm(self._snapshot_reconstruct_quad - self._snapshot, ord='fro') / np.linalg.norm(
-            self._snapshot, ord='fro')
-        print("Reconstruction error linear basis: ", err)
-        print("Reconstruction error quadratic manifold: ", err_quad)
-
-        # Retained variance
-        self.variance_linear = np.linalg.norm(self._snapshot_reconstruct_linear, ord='fro') / np.linalg.norm(self._snapshot,
-                                                                                                   ord='fro')
-        self.variance_quad = np.linalg.norm(self._snapshot_reconstruct_quad, ord='fro') / np.linalg.norm(
-            self._snapshot, ord='fro')
-        print("Retained variance on the linear POD basis: ", self.variance_linear * 100.0)
-        print("Retained variance on the quadratic manifold: ", self.variance_quad * 100.0)
 
 """
     def predict(self, points_2_predict, rom_model="NI_POD", interp_method="linear_interp", save_interpolator=False,
