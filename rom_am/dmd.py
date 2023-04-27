@@ -122,8 +122,6 @@ class DMD:
                 the same number of instants")
 
         self.tikhonov = tikhonov
-        if self.tikhonov:
-            self.x_cond = np.linalg.cond(X)
 
         self.n_timesteps = X.shape[1]
         self.init = X[:, 0]
@@ -148,7 +146,8 @@ class DMD:
             s_inv = np.zeros(s.shape)
             s_inv = 1 / s
             if self.tikhonov:
-                s_inv *= s**2 / (s**2 + self.tikhonov * self.x_cond)
+                self.x_norm = np.sqrt(np.sum(s**2))
+                s_inv *= s**2 / (s**2 + self.tikhonov * self.x_norm)
             store = np.linalg.multi_dot((Y, vh.T, np.diag(s_inv)))
             self.A_tilde = u.T @ store
 
@@ -225,7 +224,11 @@ class DMD:
                 instant of the first snapshot data.
                 - ndarray of size (n, ) when used with 'method = 1',
                 representing the prescribed initial condition at t = t1 (It has
-                to be prescribed accordingly).
+                to be prescribed accordingly). When used with 'method=0'
+                a new initial state is considered, using intermediately the POD 
+                modes of the data used in training. When used with 'method = 3'
+                a new initial state is considered, where the eigenfunction is 
+                computed.
                 - None, then the first data snapshot will be used
                 whether in 'method = 0' or 'method = 1'
                 - Disregarded when used with 'method = 3'
@@ -265,9 +268,12 @@ class DMD:
 
         self.t1 = t1
         if method == 0:
-            if init is None:
-                init = 0.
-            t1 = self.t1 + init * self.dt
+            if type(init) is np.ndarray:
+                t1 = self.t1
+            else:
+                if init is None:
+                    init = 0.
+                t1 = self.t1 + init * self.dt
         # ================================================================
         # When using method = 2, the low dimensional DMD modes W
         # were used for the amplitudes computations (least square problem)
@@ -343,7 +349,11 @@ class DMD:
                 instant of the first snapshot data.
                 - ndarray of size (n, ) when used with 'method = 1',
                 representing the prescribed initial condition at t = t1 (It has
-                to be prescribed accordingly).
+                to be prescribed accordingly). When used with 'method=0'
+                a new initial state is considered, using intermediately the POD 
+                modes of the data used in training. When used with 'method = 3'
+                a new initial state is considered, where the eigenfunction is 
+                computed.
                 - None, then the first data snapshot will be used
                 whether in 'method = 0' or 'method = 1'
 
@@ -407,14 +417,17 @@ class DMD:
                 raise Exception(
                     "The init argument should be an ndarray or None when 'method=3' is used")
         else:
-            if initial is None:
-                # The default choice is using the first snapshot's POD coefficients
-                initial = 0
-            try:
-                alpha1 = self.singvals * self.time[:, initial]
-            except:
-                raise Exception(
-                    "init argument should be an int or None when 'method=0' is used")
+            if type(initial) is np.ndarray:
+                alpha1 = self.pod_.project(initial[:, np.newaxis]).ravel()
+            else:
+                if initial is None:
+                    # The default choice is using the first snapshot's POD coefficients
+                    initial = 0
+                try:
+                    alpha1 = self.singvals * self.time[:, initial]
+                except:
+                    raise Exception(
+                        "init argument should be an int or None when 'method=0' is used")
             b = np.linalg.solve(self.lambd * self.low_dim_eig, alpha1)
 
         self.computed_amplitudes = b

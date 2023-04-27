@@ -164,14 +164,17 @@ class KERDMDC:
                 (self.koop_modes[:self.nx, :], np.diag(self.koop_eigv), self.koop_eigf_coeff.T))
         return self._koop_state_coeff
 
-    def predict(self, t, t1=0, rank=None, u_input=None):
+    def predict(self, t, t1=0, rank=None, u_input=None, init=None):
         """Predict the DMD solution on the prescribed time instants.
 
         """
 
         t_size = u_input.shape[1]
         pred = np.empty((self.nx, t_size+1), dtype=complex)
-        pred[:, 0] = self.init
+        if init is None:
+            pred[:, 0] = self.init
+        else:
+            pred[:, 0] = init
         for i in range(t_size):
             xin = np.vstack((pred[:, i].reshape((-1, 1)),
                             u_input[:, i].reshape((-1, 1))))

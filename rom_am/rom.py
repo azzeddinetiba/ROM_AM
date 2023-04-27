@@ -38,9 +38,9 @@ class ROM:
         self.singvals = None
         self.modes = None
         self.time = None
-        self.normalize = False
+        self.normalize_ = False
         self.profile = {}
-        self.center = False
+        self.center_ = False
         self.norm_info = None
         self.Y = None
         self.Y_input = None
@@ -124,11 +124,11 @@ class ROM:
             if "Y_input" in kwargs.keys():
                 self.Y_input = kwargs["Y_input"].copy()
         if center:
-            self.center = center
+            self.center_ = center
             self._center()
 
         if normalize:
-            self.normalize = normalize
+            self.normalize_ = normalize
             self.norm_info = norm_info
             self.normalization = normalization
             if self.norm_info is not None:
@@ -186,9 +186,9 @@ class ROM:
         t0 = time.time()
         res = self.model.predict(t=t, t1=t1, rank=rank, *args, **kwargs)
         t1 = time.time()
-        if self.normalize:
+        if self.normalize_:
             res = self.denormalize(res)
-        if self.center:
+        if self.center_:
             res = self.decenter(res)
         self.profile["Prediction time"] = t1-t0
         return res
