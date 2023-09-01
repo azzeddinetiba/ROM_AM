@@ -10,7 +10,7 @@ from sklearn.pipeline import make_pipeline
 import copy
 import torchvision
 import torch
-from .inferring_model import AutEnc
+#from .inferring_model import AutEnc
 
 
 class solid_ROM:
@@ -224,7 +224,7 @@ class solid_ROM:
                 self.func = [RBFInterpolator(
                     pres_coeff_tr.T, disp_coeff_tr.T, kernel=kernel, epsilon=epsilon, degree=degree)]
             else:
-                self.infer_model = AutEnc()
+                #self.infer_model = AutEnc()
                 self.infer_model.load_state_dict(torch.load(torch_model))
                 self.infer_model.eval()
                 self.infer_model = self.infer_model.double()
