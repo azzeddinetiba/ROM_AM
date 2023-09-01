@@ -54,7 +54,7 @@ class QUAD_MAN(POD):
         return X2.T
 
     def decompose(self, X, alg="svd", rank=None, opt_trunc=False, tikhonov=0, thin=False,
-                  column_selection=False, lbda=0, lbda_col=0.5, alpha0=0.01):
+                  column_selection=False, lbda=0, lbda_col=0.5, alpha0=0.01, error_comput=False):
         """
         Compute decomposition method of Quad_Manifold class
 
@@ -100,12 +100,13 @@ class QUAD_MAN(POD):
             self.Vbar @ self.Wtilde
 
         # Compute error
-        err = np.linalg.norm(self._snapshot_reconstruct_linear - X, ord='fro') / np.linalg.norm(X,
-                                                                                                ord='fro')
-        err_quad = np.linalg.norm(self._snapshot_reconstruct_quad - X, ord='fro') / np.linalg.norm(
-            X, ord='fro')
-        print("Reconstruction error linear basis: ", err)
-        print("Reconstruction error quadratic manifold: ", err_quad)
+        if error_comput:
+            self.error = np.linalg.norm(self._snapshot_reconstruct_linear - X, ord='fro') / np.linalg.norm(X,
+                                                                                                    ord='fro')
+            self.error_quad = np.linalg.norm(self._snapshot_reconstruct_quad - X, ord='fro') / np.linalg.norm(
+                X, ord='fro')
+            print("Reconstruction error linear basis: ", self.error)
+            print("Reconstruction error quadratic manifold: ", self.error_quad)
 
         return u, s, vh
 
