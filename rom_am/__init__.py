@@ -13,5 +13,5 @@ from .cnvxdmd import CnvxDMD
 from .knndmd import KnnDMD
 from .quad_man import QUAD_MAN
 from .solid_rom import solid_ROM
-from .fluid_interface_rom import fluid_ROM
-from .accel_surrog import accel_SURROG
+#from .fluid_interface_rom import fluid_ROM
+#from .accel_surrog import accel_SURROG
