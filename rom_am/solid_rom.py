@@ -1,50 +1,36 @@
 import numpy as np
-from numpy import newaxis
-from scipy.interpolate import RBFInterpolator
 from rom_am import ROM, POD, QUAD_MAN
 import time
-from sklearn.linear_model import Ridge, LassoLarsIC
-from sklearn.multioutput import MultiOutputRegressor
-from sklearn.preprocessing import PolynomialFeatures
-from sklearn.pipeline import make_pipeline
-import copy
 import torchvision
 import torch
 from .inferring_model import AutEnc
+from rom_am.regressors.polynomialLassoRegressor import PolynomialLassoRegressor
+from rom_am.regressors.polynomialRegressor import PolynomialRegressor
+from rom_am.regressors.rbfRegressor import RBFRegressor
 
 
 class solid_ROM:
 
-    def __init__(self, method=0):
+    def __init__(self,):
         self.project_time = np.array([])
         self.regression_time = np.array([])
         self.inverse_project_time = np.array([])
         self.map_mat = None
         self.inverse_project_mat = None
         self.stored_disp_coeffs = []
-        self.ridge = False
-        self.lasso = False
         self.norm_regr = False
-        self.ranks_pres = None
-        self.coords_extracted = False
         self.current_disp_coeff = None
         self.torch_model = None
 
     def train(self,
               pres_data,
               disp_data,
-              kernel='thin_plate_spline',
               rank_disp=None,
               rank_pres=None,
-              epsilon=1.,
               ids=None,
-              ids_regr=None,
               map_used=None,
-              ridge=False,
-              lasso=False,
+              regression_model=None,
               norm_regr=True,
-              degree=3,
-              alpha=1e-5,
               quad_=False,
               torch_model=None,
               norm=["minmax", "minmax"]):
@@ -195,77 +181,31 @@ class solid_ROM:
         # self.saved_disp_coeff = diameter_coeff.copy()
 
         # ========= Regression =========
-        if ids_regr is None:
-            if ids is None:
-                pres_coeff_tr = pres_coeff.copy()
-                disp_coeff_tr = disp_coeff.copy()
-            else:
-                pres_coeff_tr = np.hstack((unus_pres_coeff, pres_coeff))
-                disp_coeff_tr = np.hstack(
-                    (unus_disp_coeff, disp_coeff))
-
-            if ridge and torch_model is None:
-                self.ridge = True
-
-                model_regr = make_pipeline(
-                    PolynomialFeatures(degree), Ridge(alpha=alpha))
-                model_regr.fit(pres_coeff_tr.T, disp_coeff_tr.T)
-                self.model_regr = model_regr
-
-            elif lasso and torch_model is None:
-                self.lasso = True
-
-                model_regr = make_pipeline(
-                    PolynomialFeatures(degree), MultiOutputRegressor(LassoLarsIC(criterion='bic')))
-                model_regr.fit(pres_coeff_tr.T, disp_coeff_tr.T)
-                self.model_regr = model_regr
-
-            elif (not ridge and not lasso) and torch_model is None:
-                self.func = [RBFInterpolator(
-                    pres_coeff_tr.T, disp_coeff_tr.T, kernel=kernel, epsilon=epsilon, degree=degree)]
-            else:
-                self.infer_model = AutEnc()
-                self.infer_model.load_state_dict(torch.load(torch_model))
-                self.infer_model.eval()
-                self.infer_model = self.infer_model.double()
-
+        if ids is None:
+            pres_coeff_tr = pres_coeff.copy()
+            disp_coeff_tr = disp_coeff.copy()
         else:
+            pres_coeff_tr = np.hstack((unus_pres_coeff, pres_coeff))
+            disp_coeff_tr = np.hstack(
+                (unus_disp_coeff, disp_coeff))
 
-            all_coeff_pres = np.empty(
-                (pres_pod.kept_rank, pres_data.shape[1]))
-            all_coeff_disp = np.empty(
-                (disp_pod.kept_rank, disp_data.shape[1]))
+        if torch_model is None:
 
-            if ids is not None:
-                all_coeff_pres[:, ids] = pres_coeff
-                all_coeff_disp[:, ids] = disp_coeff
-
-                all_coeff_pres[:, np.setdiff1d(
-                    np.arange(0, m, 1), ids)] = unus_pres_coeff
-                all_coeff_disp[:, np.setdiff1d(
-                    np.arange(0, m, 1), ids)] = unus_disp_coeff
+            if regression_model is None or regression_model == "PolyLasso":
+                self.regressor = PolynomialLassoRegressor(poly_degree=2, criterion='bic')
+            elif regression_model == "PolyRdige":
+                self.regressor = PolynomialRegressor()
+            elif regression_model == "RBF":
+                self.regressor = RBFRegressor()
             else:
-                all_coeff_pres = pres_coeff.copy()
-                all_coeff_disp = disp_coeff.copy()
+                self.regressor = regression_model
 
-            self.func = []
-            for i in range(len(ids_regr)):
-                pres_coeff_tr = all_coeff_pres[:, ids_regr[i]]
-                disp_coeff_tr = all_coeff_disp[:, ids_regr[i]]
-                if not ridge and not lasso:
-                    used_kernel = kernel
-                    if type(kernel) is list:
-                        used_kernel = kernel[i]
-
-                    self.func.append(RBFInterpolator(
-                        pres_coeff_tr.T, disp_coeff_tr.T, kernel=used_kernel, epsilon=epsilon))
-                else:
-                    self.ridge = True
-
-                    model_regr = make_pipeline(
-                        PolynomialFeatures(degree), Ridge(alpha=alpha))
-                    model_regr.fit(pres_coeff_tr.T, disp_coeff_tr.T)
-                    self.func.append(copy.deepcopy(model_regr))
+            self.regressor.train(pres_coeff_tr, disp_coeff_tr)
+        else:
+            self.infer_model = AutEnc()
+            self.infer_model.load_state_dict(torch.load(torch_model))
+            self.infer_model.eval()
+            self.infer_model = self.infer_model.double()
 
         self.saved_prs_cf_tr = pres_coeff_tr.copy()
         self.saved_disp_cf_tr = disp_coeff_tr.copy()
@@ -315,11 +255,8 @@ class solid_ROM:
         # self.saved_pres_pred_coeff = pred_pres_coeff.copy()
         # ============== Regression predicts =====================
         t2 = time.time()
-        if (not self.ridge and not self.lasso) and self.torch_model is None:
-            res1 = self.func[which_func](pred_pres_coeff.T).T
-        elif (self.ridge or self.lasso) and self.torch_model is None:
-            res1 = self.model_regr.predict(pred_pres_coeff.T).T
-
+        if not self.torch_model:
+            res1 = self.regressor.predict(pred_pres_coeff)
         else:
             new_load = torch.tensor(pred_pres_coeff.T).double()
             v_latent_ = self.infer_model.encoder(new_load)
