@@ -3,7 +3,7 @@ from rom_am import ROM, POD, QUAD_MAN
 import time
 import torchvision
 import torch
-from .inferring_model import AutEnc
+#from .inferring_model import AutEnc
 from rom_am.regressors.polynomialLassoRegressor import PolynomialLassoRegressor
 from rom_am.regressors.polynomialRegressor import PolynomialRegressor
 from rom_am.regressors.rbfRegressor import RBFRegressor
@@ -202,7 +202,7 @@ class solid_ROM:
 
             self.regressor.train(pres_coeff_tr, disp_coeff_tr)
         else:
-            self.infer_model = AutEnc()
+            #self.infer_model = AutEnc()
             self.infer_model.load_state_dict(torch.load(torch_model))
             self.infer_model.eval()
             self.infer_model = self.infer_model.double()
