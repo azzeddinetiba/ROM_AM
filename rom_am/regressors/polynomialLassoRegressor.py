@@ -15,7 +15,7 @@ class PolynomialLassoRegressor(RomRegressor):
         super().train(input_data, output_data)
 
         self.regr_model = make_pipeline(
-            PolynomialFeatures(self.poly_degree), MultiOutputRegressor(LassoLarsIC(criterion=self.criterion), n_jobs=-1))
+            PolynomialFeatures(self.poly_degree), MultiOutputRegressor(LassoLarsIC(criterion=self.criterion),))
         self.regr_model.fit(input_data.T, output_data.T)
 
         self.nonzeroIds = []
