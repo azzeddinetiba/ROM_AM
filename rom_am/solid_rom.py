@@ -40,6 +40,7 @@ class solid_ROM:
         # ========= Separation of converged iterations and subiterations ==================
         unused_disp_data = None
         m = disp_data.shape[1]
+        self.map_mat = map_used
         assert (m == pres_data.shape[1])
         if ids is None:
             used_disp_data = disp_data.copy()
@@ -218,15 +219,10 @@ class solid_ROM:
                 res1 = (res1 * self.disp_coeff_std) + self.disp_coeff_mean
 
         t4 = time.time()
-        if self.map_mat is None:
-            res = self.dispReduc_model.decode(res1)
-            t5 = time.time()
-
-        else:
-
+        res = self.dispReduc_model.decode(res1)
+        if self.map_mat is not None:
             self.current_disp_coeff = res1.copy()
-            res = self.dispReduc_model._mapped_decode(res1)
-            t5 = time.time()
+        t5 = time.time()
 
         # ============== Saving some profiling information =====================
         if len(self.encoding_time) < 21:
@@ -253,4 +249,4 @@ class solid_ROM:
             self.stored_disp_coeffs.append(self.current_disp_coeff.copy())
 
     def return_big_disps(self):
-        return self.dispReduc_model.decode(self.stored_disp_coeffs)
+        return self.dispReduc_model.decode(np.hstack(self.stored_disp_coeffs), high_dim=True)

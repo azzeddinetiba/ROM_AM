@@ -40,11 +40,11 @@ class PodReducer(RomDimensionalityReducer):
         interm = self.rom.normalize(self.rom.center(new_data))
         return self.pod.project(interm)
 
-    def decode(self, new_data):
+    def decode(self, new_data, high_dim = False):
 
         self._check_decoder(new_data)
 
-        if self.map_mat is not None:
+        if self.map_mat is not None and not high_dim:
             interm = self._mapped_decode(new_data)
             if self.center:
                 interm = (
