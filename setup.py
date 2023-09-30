@@ -7,7 +7,7 @@ setup(
     description='Non-intrusive Reduced Order Modeling packages',
     author='TIBA Azzeddine',
     author_email='azzeddine.tiba@lecnam.net',
-    packages=['rom_am'],
+    packages=['rom_am', 'rom_am.regressors', 'rom_am.dimreducers', 'rom_am.dimreducers.rom_am'],
     # external packages as dependencies
     install_requires=['numpy >= 1.20.3', 'scipy >= 1.7.1',
                       'jax >= 0.2.26 ; platform_system=="linux"',
