@@ -5,8 +5,8 @@ from rom_am.dimreducers.rom_am.podReducer import PodReducer
 
 class QuadManReducer(PodReducer):
 
-    def train(self, data, normalize=True, center=True, map_used=None):
-        super().train(data, normalize, center, map_used)
+    def train(self, data, map_used=None, normalize=True, center=True):
+        super().train(data, map_used, normalize, center)
         if map_used is not None:
             self.inverse_project_Vbar = self.map_mat @ self.rom.denormalize(
                 self.pod.Vbar)

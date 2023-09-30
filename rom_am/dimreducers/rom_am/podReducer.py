@@ -7,11 +7,10 @@ class PodReducer(RomDimensionalityReducer):
 
     def __init__(self, latent_dim, ) -> None:
         super().__init__(latent_dim)
-        self.map_mat = None
 
-    def train(self, data, normalize=True, center=True, map_used=None):
+    def train(self, data, map_used=None, normalize=True, center=True):
 
-        super().train(data)
+        super().train(data, map_used)
 
         pod = self._call_POD_core()
         rom = ROM(pod)
@@ -40,7 +39,7 @@ class PodReducer(RomDimensionalityReducer):
         interm = self.rom.normalize(self.rom.center(new_data))
         return self.pod.project(interm)
 
-    def decode(self, new_data, high_dim = False):
+    def decode(self, new_data, high_dim=False):
 
         self._check_decoder(new_data)
 
@@ -63,5 +62,5 @@ class PodReducer(RomDimensionalityReducer):
         return self.inverse_project_mat @ new_data
 
     @property
-    def reduced_data(self): 
+    def reduced_data(self):
         return self.pod.pod_coeff

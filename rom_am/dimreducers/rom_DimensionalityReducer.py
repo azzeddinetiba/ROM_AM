@@ -9,15 +9,21 @@ class RomDimensionalityReducer:
     def __init__(self, latent_dim) -> None:
         self.latent_dim = latent_dim
         self._reduced_data = None
+        self.map_mat = None
         pass
 
-    def train(self, data):
+    def train(self, data, map_used=None):
         """Training the dimensionality reducer
 
         Parameters
         ----------
         data  : numpy.ndarray
             Snapshot matrix of data, of (N, m) size
+        map_used  : numpy.ndarray or None
+            Snapshot matrix of mapping indices (from interface 
+            nodes to all the nodes), of (N, n) size.
+            If None, no mapping is used
+            Default : None
 
         Returns
         ------
@@ -49,18 +55,25 @@ class RomDimensionalityReducer:
         assert (new_data.shape[0] == self.high_dim
                 ), f"The dimension of the encoder input point should be  {self.high_dim}. {new_data.shape[0]} was given."
 
-    def decode(self, new_latent_data) -> np.ndarray:
+    def decode(self, new_latent_data, high_dim=False) -> np.ndarray:
         """Training the regressor
 
         Parameters
         ----------
         new_latent_data  : numpy.ndarray
             Snapshot matrix of data, of (r, m) size
+        high_dim  : bool, optional
+            Whether or not to override the mapping and returning the
+            high dimensional space. Only considered when self.map_mat
+            is not None
+            Default : False
 
         Returns
         ------
         highDim_data  : numpy.ndarray
-            Snapshot matrix of data, of (N, m) size
+            Snapshot matrix of data, 
+            of (N, m) size
+            or (n, m) is self.map_mat is not None
 
         """
         self._check_decoder(new_latent_data)
@@ -72,7 +85,19 @@ class RomDimensionalityReducer:
 
     @property
     def reduced_data(self):
+        """Representations of the training data in the latent space
+
+        Parameters
+        ----------
+
+        Returns
+        ------
+        reduced_data  : numpy.ndarray
+            Matrix of data, of (r, m) size
+
+        """
         if self._reduced_data is None:
-            raise Exception('"reduced_data" has to be implemented in the derived class!')
+            raise Exception(
+                '"reduced_data" has to be implemented in the derived class!')
         else:
             return self._reduced_data

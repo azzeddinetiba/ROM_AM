@@ -36,6 +36,67 @@ class solid_ROM:
               dispReduc_model=None,
               norm_regr=[True, True],
               norm=["minmax", "minmax"]):
+        """Training the solid ROM model
+
+        Parameters
+        ----------
+        pres_data  : numpy.ndarray
+            Snapshot matrix of fluid forces data (input), of (Nf, m) size
+        disp_data  : numpy.ndarray
+            Snapshot matrix of fluid forces data (output), of (Ns, m) size
+        rank_disp  : int, double or None
+            The latent dimension for the displacement field.
+            If dispReduc_model is a an instance of a custom class, rank_disp
+            is ignored. If dispReduc_model is chosen among `dimreducers`
+            implemented classes, it is chosen as the latent dimension.
+            If None, no reduction is used on the POD.
+            Default : None
+        rank_pres  : int, double or None
+            The latent dimension for the forces field.
+            If forcesReduc_model is a an instance of a custom class, 
+            `rank_pres` is ignored. If forcesReduc_model is chosen 
+            among `dimreducers` implemented classes, it is chosen as 
+            the latent dimension.
+            If None, no reduction is used on the POD.
+            Default : None
+        ids        : numpy.ndarray, optional
+            Array of indices corresponding to the data points used for the 
+            dimensionality reduction. If None, all the data is used. 
+            Default : None
+        map_used   : numpy.ndarray or None
+            Snapshot matrix of mapping indices (from interface 
+            nodes to all the nodes), of (N, n) size.
+            If None, no mapping is used
+            Default : None
+        regression_model   : str, RomRegressor or None
+            An instance of the RomRegressor class for the regression.
+            If None or "PolyLasso", PolynomialLassoRegressor is used.
+            If "PolyRidge" PolynomialRegressor is used.
+            If "RBF" RBFRegressor is used.
+            Default : None
+        forcesReduc_model   : str, RomDimensionalityReducer or None
+            An instance of the RomDimensionalityReducer class for the input encoder.
+            If None or "POD", PodReducer is used.
+            Default : None
+        dispReduc_model   : str, RomDimensionalityReducer or None
+            An instance of the RomDimensionalityReducer class for the output decoder.
+            If None or "QUAD", QuadManReducer is used.
+            If "POD", PodReducer is used
+            Default : None
+        norm_regr  : list of 2 booleans, optional
+            Whether to normalize the inputs and outputs of the regression
+            model. The normalization used is chosen by the `norm`argument
+            Default : [True, True]
+        norm       : list of 2 strs, optional
+            Type of normalization used ([inputs, outputs]).
+            "minmax" for min-max normalization. "l2" for L2
+            normalization. "std" for standardization.
+            Default : ["minmax", "minmax"]
+
+        Returns
+        ------
+
+        """
 
         # ========= Separation of converged iterations and subiterations ==================
         unused_disp_data = None
@@ -175,7 +236,7 @@ class solid_ROM:
         if regression_model is None or regression_model == "PolyLasso":
             self.regressor = PolynomialLassoRegressor(
                 poly_degree=2, criterion='bic')
-        elif regression_model == "PolyRdige":
+        elif regression_model == "PolyRidge":
             self.regressor = PolynomialRegressor()
         elif regression_model == "RBF":
             self.regressor = RBFRegressor()
@@ -187,7 +248,19 @@ class solid_ROM:
         # self.saved_disp_cf_tr = disp_coeff_tr.copy()
 
     def pred(self, new_pres):
+        """Solid ROM prediction
 
+        Parameters
+        ----------
+        new_pres  : numpy.ndarray
+            Snapshot matrix of input data, of (Nin, m) size
+
+        Returns
+        ------
+        output_result : numpy.ndarray
+            Solution matrix data, of (Nout, m) size
+            
+        """
         t0 = time.time()
         pred_pres_coeff = self.forcesReduc.encode(new_pres)
         t1 = time.time()
