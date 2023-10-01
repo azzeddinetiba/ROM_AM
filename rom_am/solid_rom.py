@@ -1,5 +1,8 @@
 import numpy as np
-from rom_am import ROM, POD, QUAD_MAN
+from rom_am.pod import POD
+from rom_am.rom import ROM
+from rom_am.quad_man import QUAD_MAN
+
 import time
 import torchvision
 import torch

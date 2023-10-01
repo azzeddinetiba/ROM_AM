@@ -1,5 +1,5 @@
 import numpy as np
-from .dmd import DMD
+from rom_am.dmd import DMD
 from scipy.spatial import KDTree
 from scipy.optimize import nnls
 

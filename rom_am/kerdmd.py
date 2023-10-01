@@ -1,6 +1,6 @@
 import numpy as np
 from numpy import s_
-from .dmd import DMD
+from rom_am.dmd import DMD
 
 
 class KERDMD(DMD):

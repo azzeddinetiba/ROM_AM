@@ -1,5 +1,6 @@
 import numpy as np
-from rom_am import POD, ROM
+from rom_am.pod import POD
+from rom_am.rom import ROM
 from rom_am.dimreducers.rom_DimensionalityReducer import *
 
 

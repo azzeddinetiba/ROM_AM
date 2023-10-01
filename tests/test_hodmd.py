@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from rom_am import HODMD
+from rom_am.hodmd import HODMD
 
 
 """

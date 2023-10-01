@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from rom_am import KERDMD
+from rom_am.kerdmd import KERDMD
 
 
 """

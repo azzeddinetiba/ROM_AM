@@ -1,6 +1,6 @@
 from re import A
 import numpy as np
-from .pod import POD
+from rom_am.pod import POD
 import warnings
 
 

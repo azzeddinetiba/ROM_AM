@@ -1,6 +1,6 @@
 import numpy as np
-from .dmd import DMD
-from .pod import POD
+from rom_am.dmd import DMD
+from rom_am.pod import POD
 import warnings
 
 

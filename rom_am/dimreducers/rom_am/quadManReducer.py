@@ -1,5 +1,5 @@
 import numpy as np
-from rom_am import QUAD_MAN
+from rom_am.quad_man import QUAD_MAN
 from rom_am.dimreducers.rom_am.podReducer import PodReducer
 
 

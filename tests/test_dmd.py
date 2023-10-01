@@ -1,7 +1,7 @@
 import pytest
 import sys
 import numpy as np
-from rom_am import DMD
+from rom_am.dmd import DMD
 
 os_ = 1
 if "linux" in sys.platform:

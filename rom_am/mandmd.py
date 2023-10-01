@@ -2,9 +2,9 @@ from weakref import ref
 import numpy as np
 from scipy.interpolate import RBFInterpolator
 from scipy.linalg import logm, expm
-from .pod import POD
-from .dmd import DMD
-from .hodmd import HODMD
+from rom_am.pod import POD
+from rom_am.dmd import DMD
+from rom_am.hodmd import HODMD
 from copy import deepcopy
 
 

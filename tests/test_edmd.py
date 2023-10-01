@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from rom_am import EDMD
+from rom_am.edmd import EDMD
 
 """
 Tests on Extended DMD based on the nonlinear spring example (with unsteady

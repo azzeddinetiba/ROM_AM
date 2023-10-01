@@ -1,5 +1,5 @@
 import numpy as np
-from rom_am import DMDc
+from rom_am.dmdc import DMDc
 
 
 # DMD with control

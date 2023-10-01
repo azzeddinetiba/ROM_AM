@@ -2,9 +2,9 @@ import imp
 import numpy as np
 from scipy import interpolate
 from scipy.interpolate import RBFInterpolator
-from .pod import POD
-from .dmd import DMD
-from .hodmd import HODMD
+from rom_am.pod import POD
+from rom_am.dmd import DMD
+from rom_am.hodmd import HODMD
 from copy import deepcopy
 
 
