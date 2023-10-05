@@ -6,16 +6,17 @@ from rom_am.regressors.rom_regressor import *
 
 class PolynomialLassoRegressor(RomRegressor):
 
-    def __init__(self, poly_degree, criterion='bic') -> None:
+    def __init__(self, poly_degree, criterion='bic', intercept_=True) -> None:
         super().__init__()
         self.criterion = criterion
         self.poly_degree = poly_degree
+        self.intercept_ = intercept_
 
     def train(self, input_data, output_data):
         super().train(input_data, output_data)
 
         self.regr_model = make_pipeline(
-            PolynomialFeatures(self.poly_degree), MultiOutputRegressor(LassoLarsIC(criterion=self.criterion),))
+            PolynomialFeatures(self.poly_degree, include_bias=self.intercept_), MultiOutputRegressor(LassoLarsIC(criterion=self.criterion),))
         self.regr_model.fit(input_data.T, output_data.T)
 
         self.nonzeroIds = []
@@ -24,8 +25,6 @@ class PolynomialLassoRegressor(RomRegressor):
                 self.regr_model["multioutputregressor"].estimators_[i].coef_) > 1e-9)[:, 0])
 
     def predict(self, new_input):
-
-        super()._check_predict(new_input)
 
         # Instead of self.regr_model.predict(new_input.T).T, the following is faster :
         self.polyFeatures = self.regr_model["polynomialfeatures"].transform(

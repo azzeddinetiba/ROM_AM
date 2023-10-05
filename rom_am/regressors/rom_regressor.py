@@ -44,10 +44,13 @@ class RomRegressor:
             Solution matrix data, of (Nout, m) size
 
         """
-        self._check_predict(new_input)
         raise Exception(
             '"Predict" has to be implemented in the derived class!')
 
-    def _check_predict(self, new_input):
+    def check_predict_in(self, new_input):
         assert (new_input.shape[0] == self.input_dim
-                ), f"The dimension of the regression input points is {self.input_dim}. {new_input.shape[0]} was given."
+                ), f"The dimension of the regression input points should be {self.input_dim}. {new_input.shape[0]} was given."
+
+    def check_predict_out(self, output):
+        assert (output.shape[0] == self.output_dim
+                ), f"The regression output should be of dimension {self.output_dim}. {output.shape[0]}-dimensional data was computed."
