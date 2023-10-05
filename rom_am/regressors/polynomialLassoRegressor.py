@@ -4,6 +4,7 @@ from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import make_pipeline
 from rom_am.regressors.rom_regressor import *
 
+
 class PolynomialLassoRegressor(RomRegressor):
 
     def __init__(self, poly_degree, criterion='bic', intercept_=True) -> None:
@@ -31,7 +32,8 @@ class PolynomialLassoRegressor(RomRegressor):
             new_input.T)
 
         def mult_(proc):
-            linear_ = self.polyFeatures[:, self.nonzeroIds[proc]] @ self.regr_model["multioutputregressor"].estimators_[proc].coef_[self.nonzeroIds[proc]].reshape((-1, 1))
+            linear_ = self.polyFeatures[:, self.nonzeroIds[proc]] @ self.regr_model["multioutputregressor"].estimators_[
+                proc].coef_[self.nonzeroIds[proc]].reshape((-1, 1))
             return linear_ + self.regr_model["multioutputregressor"].estimators_[proc].intercept_
 
         res = np.empty((self.output_dim, new_input.shape[1]))
@@ -39,10 +41,10 @@ class PolynomialLassoRegressor(RomRegressor):
             res[i, :] = mult_(i).ravel()
 
         # TODO is this even faster ?
-        #from joblib import Parallel, delayed
-        #n_CPUs = 8
-        #res1 = Parallel(n_jobs=n_CPUs)(delayed(mult_)(i)
+        # from joblib import Parallel, delayed
+        # n_CPUs = 8
+        # res1 = Parallel(n_jobs=n_CPUs)(delayed(mult_)(i)
         #                               for i in range(self.output_dim))
-        #res = np.hstack((res1))
+        # res = np.hstack((res1))
 
         return res

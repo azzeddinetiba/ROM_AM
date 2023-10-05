@@ -136,10 +136,15 @@ class solid_ROM:
 
         if ids is not None:
 
+            self.forcesReduc.check_encoder_in(unused_pres_data)
             unus_pres_coeff = self.forcesReduc.encode(
                 unused_pres_data)
+            self.forcesReduc.check_encoder_out(unus_pres_coeff)
+            self.dispReduc_model.check_encoder_in(unused_disp_data)
             unus_disp_coeff = self.dispReduc_model.encode(
                 unused_disp_data)
+            self.dispReduc_model.check_encoder_out(unus_disp_coeff)
+
 
         self.norm_regr = [False, False]
         self.norms = norm
