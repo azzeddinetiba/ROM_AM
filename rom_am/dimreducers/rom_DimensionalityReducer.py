@@ -10,6 +10,7 @@ class RomDimensionalityReducer:
         self.latent_dim = latent_dim
         self._reduced_data = None
         self.map_mat = None
+        self.interface_dim = None
         pass
 
     def train(self, data, map_used=None):
@@ -48,12 +49,7 @@ class RomDimensionalityReducer:
             Snapshot matrix of data, of (r, m) size
 
         """
-        self._check_encoder(new_data)
         raise Exception('"encode" has to be implemented in the derived class!')
-
-    def _check_encoder(self, new_data):
-        assert (new_data.shape[0] == self.high_dim
-                ), f"The dimension of the encoder input point should be  {self.high_dim}. {new_data.shape[0]} was given."
 
     def decode(self, new_latent_data, high_dim=False) -> np.ndarray:
         """Training the regressor
@@ -76,12 +72,27 @@ class RomDimensionalityReducer:
             or (n, m) is self.map_mat is not None
 
         """
-        self._check_decoder(new_latent_data)
         raise Exception('"decode" has to be implemented in the derived class!')
 
-    def _check_decoder(self, new_latent_data):
+    def check_decoder_in(self, new_latent_data):
         assert (new_latent_data.shape[0] == self.latent_dim
                 ), f"The dimension of the decoder input point should be  {self.latent_dim}. {new_latent_data.shape[0]} was given."
+
+    def check_decoder_out(self, new_out_data):
+        if self.map_mat is None:
+            out_dim = self.high_dim
+        else:
+            out_dim = self.interface_dim
+        assert (new_out_data.shape[0] == out_dim
+                ), f"The dimension of the decoded point should be  {out_dim}. {new_out_data.shape[0]}-dimensional data was computed."
+
+    def check_encoder_in(self, new_data):
+        assert (new_data.shape[0] == self.high_dim
+                ), f"The dimension of the encoder input point should be  {self.high_dim}. {new_data.shape[0]} was given."
+
+    def check_encoder_out(self, new_encoded_data):
+        assert (new_encoded_data.shape[0] == self.latent_dim
+                ), f"The dimension of the encoded point should be  {self.latent_dim}. {new_encoded_data.shape[0]}-dimensional data was computed."
 
     @property
     def reduced_data(self):

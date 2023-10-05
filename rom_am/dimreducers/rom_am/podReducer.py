@@ -25,6 +25,7 @@ class PodReducer(RomDimensionalityReducer):
         self.pod = pod
 
         if map_used is not None:
+            self.interface_dim = map_used.shape[0]
             self.map_mat = map_used
             self.inverse_project_mat = self.map_mat @ self.rom.denormalize(
                 self.pod.modes)
@@ -35,14 +36,10 @@ class PodReducer(RomDimensionalityReducer):
 
     def encode(self, new_data):
 
-        self._check_encoder(new_data)
-
         interm = self.rom.normalize(self.rom.center(new_data))
         return self.pod.project(interm)
 
     def decode(self, new_data, high_dim=False):
-
-        self._check_decoder(new_data)
 
         if self.map_mat is not None and not high_dim:
             interm = self._mapped_decode(new_data)

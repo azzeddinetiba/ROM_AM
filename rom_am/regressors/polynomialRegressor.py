@@ -19,6 +19,4 @@ class PolynomialRegressor(RomRegressor):
         self.regr_model.fit(input_data.T, output_data.T)
 
     def predict(self, new_input):
-
-        super()._check_predict(new_input)
         return self.regr_model.predict(new_input.T).T

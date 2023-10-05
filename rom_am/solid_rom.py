@@ -1,12 +1,5 @@
 import numpy as np
-from rom_am.pod import POD
-from rom_am.rom import ROM
-from rom_am.quad_man import QUAD_MAN
-
 import time
-import torchvision
-import torch
-# from .inferring_model import AutEnc
 from rom_am.regressors.polynomialLassoRegressor import PolynomialLassoRegressor
 from rom_am.regressors.polynomialRegressor import PolynomialRegressor
 from rom_am.regressors.rbfRegressor import RBFRegressor
@@ -265,7 +258,9 @@ class solid_ROM:
             
         """
         t0 = time.time()
+        self.forcesReduc.check_encoder_in(new_pres)
         pred_pres_coeff = self.forcesReduc.encode(new_pres)
+        self.forcesReduc.check_encoder_out(pred_pres_coeff)
         t1 = time.time()
 
         if self.norm_regr[0]:
@@ -282,7 +277,9 @@ class solid_ROM:
         # self.saved_pres_pred_coeff = pred_pres_coeff.copy()
         # ============== Regression predicts =====================
         t2 = time.time()
+        self.regressor.check_predict_in(pred_pres_coeff)
         res1 = self.regressor.predict(pred_pres_coeff)
+        self.regressor.check_predict_out(res1)
         t3 = time.time()
 
         # ============== Denormalize Displ. coefficients =====================
@@ -295,7 +292,9 @@ class solid_ROM:
                 res1 = (res1 * self.disp_coeff_std) + self.disp_coeff_mean
 
         t4 = time.time()
+        self.dispReduc_model.check_decoder_in(res1)
         res = self.dispReduc_model.decode(res1)
+        self.dispReduc_model.check_decoder_out(res)
         if self.map_mat is not None:
             self.current_disp_coeff = res1.copy()
         t5 = time.time()
@@ -311,9 +310,9 @@ class solid_ROM:
 
     def save_times(self, files_names):
 
-        if len(self.project_time) < 21:
-            time_arrays = [self.project_time, self.regression_time,
-                           self.inverse_project_time,]
+        if len(self.encoding_time) < 21:
+            time_arrays = [self.encoding_time, self.regression_time,
+                           self.decoding_time,]
             for i in range(3):
                 np.save(files_names[i], time_arrays[i])
         else:

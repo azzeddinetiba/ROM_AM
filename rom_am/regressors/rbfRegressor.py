@@ -21,6 +21,4 @@ class RBFRegressor(RomRegressor):
             epsilon=self.epsilon, degree=self.degree)
 
     def predict(self, new_input):
-
-        super()._check_predict(new_input)
         return self.regr_model(new_input.T).T
