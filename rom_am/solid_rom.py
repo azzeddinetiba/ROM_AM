@@ -5,6 +5,7 @@ from rom_am.regressors.polynomialRegressor import PolynomialRegressor
 from rom_am.regressors.rbfRegressor import RBFRegressor
 from rom_am.dimreducers.rom_am.podReducer import PodReducer
 from rom_am.dimreducers.rom_am.quadManReducer import QuadManReducer
+import pickle
 
 
 class solid_ROM:
@@ -30,8 +31,8 @@ class solid_ROM:
               regression_model=None,
               forcesReduc_model=None,
               dispReduc_model=None,
-              norm_regr=[True, True],
-              norm=["minmax", "minmax"]):
+              norm_regr=[False, False],
+              norm=["l2", "l2"]):
         """Training the solid ROM model
 
         Parameters
@@ -144,7 +145,6 @@ class solid_ROM:
             unus_disp_coeff = self.dispReduc_model.encode(
                 unused_disp_data)
             self.dispReduc_model.check_encoder_out(unus_disp_coeff)
-
 
         self.norm_regr = [False, False]
         self.norms = norm
@@ -260,7 +260,7 @@ class solid_ROM:
         ------
         output_result : numpy.ndarray
             Solution matrix data, of (Nout, m) size
-            
+
         """
         t0 = time.time()
         self.forcesReduc.check_encoder_in(new_pres)
@@ -330,3 +330,7 @@ class solid_ROM:
 
     def return_big_disps(self):
         return self.dispReduc_model.decode(np.hstack(self.stored_disp_coeffs), high_dim=True)
+
+    def save(self, file_name):
+        with open(file_name+'.pkl', 'wb') as outp:
+            pickle.dump(self, outp, pickle.HIGHEST_PROTOCOL)

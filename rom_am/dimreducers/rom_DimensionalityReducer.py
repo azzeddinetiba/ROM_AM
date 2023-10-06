@@ -30,8 +30,9 @@ class RomDimensionalityReducer:
         ------
 
         """
-        assert (data.shape[0] >= self.latent_dim
-                ), "Training data has to have a bigger dimension than the DimReducer latent dimension."
+        if self.latent_dim is not None:
+            assert (data.shape[0] >= self.latent_dim
+                    ), "Training data has to have a bigger dimension than the DimReducer latent dimension."
         self.high_dim = data.shape[0]
         pass
 
