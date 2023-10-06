@@ -5,7 +5,7 @@ from rom_am.regressors.rom_regressor import *
 
 class RBFRegressor(RomRegressor):
 
-    def __init__(self, kernel="rhin_plate_spline", epsilon=1., degree=1) -> None:
+    def __init__(self, kernel="thin_plate_spline", epsilon=1., degree=1) -> None:
         super().__init__()
 
         self.kernel = kernel
