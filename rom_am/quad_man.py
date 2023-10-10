@@ -1,8 +1,7 @@
+# Authors: DAIRAY Thibault, TIBA Azzeddine
+
 import numpy as np
-import scipy.linalg as sp
 from rom_am.pod import POD
-import sys
-import warnings
 from scipy.linalg import lstsq
 
 
