@@ -45,7 +45,7 @@ class PodReducer(RomDimensionalityReducer):
             interm = self._mapped_decode(new_data)
             if self.center:
                 interm = (
-                    interm + self.mapped_mean_flow).reshape((-1, new_data.shape[1]))
+                    interm + self.mapped_mean_flow)
             return interm
 
         else:

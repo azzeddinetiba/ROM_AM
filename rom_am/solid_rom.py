@@ -115,7 +115,7 @@ class solid_ROM:
         # ========= Reduction of the displacement data ==================
         if dispReduc_model == "POD":
             self.dispReduc_model = PodReducer(latent_dim=rank_disp)
-        elif dispReduc_model is None or forcesReduc_model == "QUAD":
+        elif dispReduc_model is None or dispReduc_model == "QUAD":
             self.dispReduc_model = QuadManReducer(
                 latent_dim=rank_disp)
         else:

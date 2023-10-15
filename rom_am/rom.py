@@ -259,6 +259,8 @@ class ROM:
                 temp = np.vstack(
                     (np.hstack((self.snapshots, self.Y[:, -1].reshape((-1, 1)))), np.hstack((self.Y_input, self.Y_input[:, -1][:, np.newaxis]))))
             self.snap_norms = np.linalg.norm(temp, axis=1)
+            self.zeroIds = np.argwhere(np.isclose(
+                self.snap_norms, 0)).ravel()
             self.snap_norms = np.where(np.isclose(
                 self.snap_norms, 0), 1, self.snap_norms)
             if self.Y_input is not None:
@@ -302,9 +304,13 @@ class ROM:
             return res * self.max_min + self.snap_min[:, np.newaxis]
         elif self.normalization == "norm":
             if self.Y_input is not None:
-                return res * self.snap_norms[:self.nx, np.newaxis]
+                dirichletNorms = self.snap_norms[:self.nx, np.newaxis]
+                dirichletNorms[self.zeroIds] = 0.
+                return res * dirichletNorms
             else:
-                return res * self.snap_norms[:, np.newaxis]
+                dirichletNorms = self.snap_norms[:, np.newaxis]
+                dirichletNorms[self.zeroIds] = 0.
+                return res * dirichletNorms
         elif self.normalization == "spec":
             return res * np.repeat(self.norm_info[:, 0], self.norm_info[:, 1].astype(int))[
                 :, np.newaxis]
