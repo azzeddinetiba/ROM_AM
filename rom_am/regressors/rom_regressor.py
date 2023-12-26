@@ -54,3 +54,6 @@ class RomRegressor:
     def check_predict_out(self, output):
         assert (output.shape[0] == self.output_dim
                 ), f"The regression output should be of dimension {self.output_dim}. {output.shape[0]}-dimensional data was computed."
+
+    def checkAposterioriError(self, ):
+        pass

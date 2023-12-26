@@ -68,46 +68,49 @@ class QUAD_MAN(POD):
         :rtype: None
         """
 
-        u, s, vh = super().decompose(X, alg, rank, opt_trunc, tikhonov, thin)
+        _, _, _ = super().decompose(X, alg, rank, opt_trunc, tikhonov, thin)
 
         self._snapshot_reduce = super().project(X)
-        self._snapshot_reconstruct_linear = self.reconstruct()
-        self.err = X - self._snapshot_reconstruct_linear
+        err = X - self.reconstruct()
 
         # Compute the Kronecker product without redundancy
-        self.W = self._kron_x_sq(self._snapshot_reduce)
+        W = self._kron_x_sq(self._snapshot_reduce)
 
         if column_selection:
-            VbarTinit = np.zeros((self.W.T.shape[1], self.err.T.shape[1]))
+            VbarTinit = np.zeros((W.T.shape[1], err.T.shape[1]))
             columns, _, _, _ = self._column_selection(
-                self.W.T, self.err.T, VbarTinit, lbda_col, alpha0)
+                W.T, err.T, VbarTinit, lbda_col, alpha0)
             self.columns = columns
             print("Colonnes retenues: ", columns)
-            self.Wtilde = self.W[columns, :]
+            Wtilde = W[columns, :]
         else:
-            self.columns = np.arange(0, self.W.shape[0], 1).astype(int)
-            self.Wtilde = self.W
+            self.columns = np.arange(0, W.shape[0], 1).astype(int)
+            Wtilde = W
 
-        q = self.err.shape[0]
-        p = self.Wtilde.shape[0]
-        Aplus = np.concatenate(
-            (self.Wtilde.T, np.sqrt(lbda) * np.eye(p)), axis=0)
-        bplus = np.concatenate((self.err.T, np.zeros((p, q))), axis=0)
-        self.Vbar = lstsq(Aplus, bplus)[0].T
-
-        self._snapshot_reconstruct_quad = self._snapshot_reconstruct_linear + \
-            self.Vbar @ self.Wtilde
+        q = X.shape[0]
+        p = Wtilde.shape[0]
+        if lbda > 1e-12:
+            Aplus = np.concatenate(
+                (Wtilde.T, np.sqrt(lbda) * np.eye(p)), axis=0)
+            bplus = np.concatenate((err.T, np.zeros((p, q))), axis=0)
+            self.Vbar = lstsq(Aplus, bplus)[0].T
+        else:
+            self.Vbar = lstsq(Wtilde.T, err.T)[0].T
 
         # Compute error
         if error_comput:
-            self.error = np.linalg.norm(self._snapshot_reconstruct_linear - X, ord='fro') / np.linalg.norm(X,
+            self.err = err
+            _snapshot_reconstruct_quad = self.reconstruct() + \
+                self.Vbar @ Wtilde
+
+            self.error = np.linalg.norm(self.reconstruct() - X, ord='fro') / np.linalg.norm(X,
                                                                                                     ord='fro')
-            self.error_quad = np.linalg.norm(self._snapshot_reconstruct_quad - X, ord='fro') / np.linalg.norm(
+            self.error_quad = np.linalg.norm(_snapshot_reconstruct_quad - X, ord='fro') / np.linalg.norm(
                 X, ord='fro')
             print("Reconstruction error linear basis: ", self.error)
             print("Reconstruction error quadratic manifold: ", self.error_quad)
 
-        return u, s, vh
+        return 0., 0., 0.
 
     def inverse_project(self, new_reduced_data):
 

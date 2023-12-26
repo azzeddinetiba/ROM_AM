@@ -32,7 +32,9 @@ class solid_ROM:
               forcesReduc_model=None,
               dispReduc_model=None,
               norm_regr=[False, False],
-              norm=["l2", "l2"]):
+              norm=["l2", "l2"],
+              algs=["svd", "svd"],
+              to_copy=[True, True],):
         """Training the solid ROM model
 
         Parameters
@@ -50,18 +52,18 @@ class solid_ROM:
             Default : None
         rank_pres  : int, double or None
             The latent dimension for the forces field.
-            If forcesReduc_model is a an instance of a custom class, 
-            `rank_pres` is ignored. If forcesReduc_model is chosen 
-            among `dimreducers` implemented classes, it is chosen as 
+            If forcesReduc_model is a an instance of a custom class,
+            `rank_pres` is ignored. If forcesReduc_model is chosen
+            among `dimreducers` implemented classes, it is chosen as
             the latent dimension.
             If None, no reduction is used on the POD.
             Default : None
         ids        : numpy.ndarray, optional
-            Array of indices corresponding to the data points used for the 
-            dimensionality reduction. If None, all the data is used. 
+            Array of indices corresponding to the data points used for the
+            dimensionality reduction. If None, all the data is used.
             Default : None
         map_used   : numpy.ndarray or None
-            Snapshot matrix of mapping indices (from interface 
+            Snapshot matrix of mapping indices (from interface
             nodes to all the nodes), of (N, n) size.
             If None, no mapping is used
             Default : None
@@ -89,6 +91,11 @@ class solid_ROM:
             "minmax" for min-max normalization. "l2" for L2
             normalization. "std" for standardization.
             Default : ["minmax", "minmax"]
+        norm       : list of 2 strs, optional
+            Type of decomposition used ([inputs, outputs]).
+            Whether to use the SVD on decomposition ("svd") or
+            the eigenvalue problem on snaphot matrices ("snap")
+            Default : ["svd", "svd"]
 
         Returns
         ------
@@ -101,8 +108,8 @@ class solid_ROM:
         self.map_mat = map_used
         assert (m == pres_data.shape[1])
         if ids is None:
-            used_disp_data = disp_data.copy()
-            used_pres_data = pres_data.copy()
+            used_disp_data = disp_data
+            used_pres_data = pres_data
 
         else:
             used_disp_data = disp_data[:, ids]
@@ -121,7 +128,7 @@ class solid_ROM:
         else:
             self.dispReduc_model = dispReduc_model
 
-        self.dispReduc_model.train(used_disp_data, map_used=map_used)
+        self.dispReduc_model.train(used_disp_data, map_used=map_used, alg = algs[1], to_copy=to_copy[1])
         disp_coeff = self.dispReduc_model.reduced_data
 
         # ========= Reduction of the pressure data ==================
@@ -132,7 +139,7 @@ class solid_ROM:
         else:
             self.forcesReduc = forcesReduc_model
 
-        self.forcesReduc.train(used_pres_data)
+        self.forcesReduc.train(used_pres_data, alg = algs[0], to_copy=to_copy[0])
         pres_coeff = self.forcesReduc.reduced_data
 
         if ids is not None:
@@ -265,7 +272,10 @@ class solid_ROM:
         t0 = time.time()
         self.forcesReduc.check_encoder_in(new_pres)
         pred_pres_coeff = self.forcesReduc.encode(new_pres)
-        self.forcesReduc.check_encoder_out(pred_pres_coeff)
+        if pred_pres_coeff is None:
+            return None
+        else:
+            self.forcesReduc.check_encoder_out(pred_pres_coeff)
         t1 = time.time()
 
         if self.norm_regr[0]:

@@ -2,6 +2,9 @@ import numpy as np
 from rom_am.pod import POD
 from rom_am.rom import ROM
 from rom_am.dimreducers.rom_DimensionalityReducer import *
+from scipy.spatial import KDTree
+from scipy.spatial import Delaunay
+from sklearn.preprocessing import MinMaxScaler
 
 
 class PodReducer(RomDimensionalityReducer):
@@ -9,14 +12,15 @@ class PodReducer(RomDimensionalityReducer):
     def __init__(self, latent_dim, ) -> None:
         super().__init__(latent_dim)
 
-    def train(self, data, map_used=None, normalize=True, center=True):
+    def train(self, data, map_used=None, normalize=True, center=True, alg = "svd", to_copy=True):
 
         super().train(data, map_used)
 
         pod = self._call_POD_core()
         rom = ROM(pod)
+
         rom.decompose(X=data, normalize=normalize, center=center,
-                      rank=self.latent_dim)
+                      rank=self.latent_dim, alg=alg, to_copy=to_copy)
 
         self.latent_dim = pod.kept_rank
         self.normalize = normalize
@@ -34,10 +38,29 @@ class PodReducer(RomDimensionalityReducer):
                 self.mapped_mean_flow = self.map_mat @ self.rom.mean_flow.reshape(
                     (-1, 1))
 
+        """
+        self.minmaxScaler = MinMaxScaler()
+        self.minmaxScaler.fit(self.pod.pod_coeff[:3, :].T)
+        self.tree = KDTree(self.minmaxScaler.transform(
+            self.pod.pod_coeff[:3, :].T))
+        self.hull = Delaunay(self.minmaxScaler.transform(
+            self.pod.pod_coeff[:3, :].T))
+        dists, _ = self.tree.query(self.minmaxScaler.transform(
+            self.pod.pod_coeff[:3, :].T), k=self.pod.pod_coeff.shape[1])
+        self.max_dist = dists.max()
+        """
+
     def encode(self, new_data):
 
         interm = self.rom.normalize(self.rom.center(new_data))
-        return self.pod.project(interm)
+        encoded_ = self.pod.project(interm)
+        #self._check_encode_nearness(encoded_)
+        #accurate_ = self._check_encode_accuracy(new_data, encoded_)
+        #if accurate_ is None:
+        if False:
+            return None
+        else:
+            return encoded_
 
     def decode(self, new_data, high_dim=False):
 

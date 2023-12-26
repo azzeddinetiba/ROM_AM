@@ -1,5 +1,5 @@
 import numpy as np
-
+import warnings
 
 class RomDimensionalityReducer:
     """Baseclass for dimensionality reduction used in the latent space
@@ -11,6 +11,8 @@ class RomDimensionalityReducer:
         self._reduced_data = None
         self.map_mat = None
         self.interface_dim = None
+        self.tree = None
+        self.hull = None
         pass
 
     def train(self, data, map_used=None):
@@ -21,7 +23,7 @@ class RomDimensionalityReducer:
         data  : numpy.ndarray
             Snapshot matrix of data, of (N, m) size
         map_used  : numpy.ndarray or None
-            Snapshot matrix of mapping indices (from interface 
+            Snapshot matrix of mapping indices (from interface
             nodes to all the nodes), of (N, n) size.
             If None, no mapping is used
             Default : None
@@ -68,7 +70,7 @@ class RomDimensionalityReducer:
         Returns
         ------
         highDim_data  : numpy.ndarray
-            Snapshot matrix of data, 
+            Snapshot matrix of data,
             of (N, m) size
             or (n, m) is self.map_mat is not None
 
@@ -94,6 +96,30 @@ class RomDimensionalityReducer:
     def check_encoder_out(self, new_encoded_data):
         assert (new_encoded_data.shape[0] == self.latent_dim
                 ), f"The dimension of the encoded point should be  {self.latent_dim}. {new_encoded_data.shape[0]}-dimensional data was computed."
+
+    def _check_encode_accuracy(self, point, encoded_):
+        decode = getattr(self, "decode", None)
+        if callable(decode):
+            reconstructed_ = decode(encoded_, high_dim=True)
+            err = np.linalg.norm(reconstructed_ - point, axis = 0)/np.linalg.norm(point, axis = 0)
+            self.EncReconsErr = err
+            if np.max(err) > 0.1:
+                warnings.warn("The encoder isn't working well")
+                return None
+            else:
+                return 0
+        else:
+            return 0
+
+    def _check_encode_nearness(self, encoded_):
+        try:
+            if self.hull.find_simplex(self.minmaxScaler.transform((encoded_[:3, :].T)))<0:
+                dist, _ = self.tree.query(self.minmaxScaler.transform((encoded_[:3, :].T)))
+                if dist > 0.2 * self.max_dist:
+                    warnings.warn("Warning, the new point is too far")
+        except AttributeError:
+            pass
+
 
     @property
     def reduced_data(self):
