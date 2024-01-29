@@ -1,3 +1,4 @@
+from xml.dom.expatbuilder import Rejecter
 import numpy as np
 import time
 from rom_am.regressors.polynomialLassoRegressor import PolynomialLassoRegressor
@@ -34,7 +35,8 @@ class solid_ROM:
               norm_regr=[False, False],
               norm=["l2", "l2"],
               algs=["svd", "svd"],
-              to_copy=[True, True],):
+              to_copy=[True, True],
+              remove_outliers=False):
         """Training the solid ROM model
 
         Parameters
@@ -241,6 +243,11 @@ class solid_ROM:
             disp_coeff_tr = np.hstack(
                 (unus_disp_coeff, disp_coeff))
 
+        # Removing outliers
+        if remove_outliers:
+            pres_coeff_tr, ids_tr = self.reject_outliers(pres_coeff_tr)
+            disp_coeff_tr = disp_coeff_tr[:, ids_tr]
+
         if regression_model is None or regression_model == "PolyLasso":
             self.regressor = PolynomialLassoRegressor(
                 poly_degree=2, criterion='bic')
@@ -254,6 +261,10 @@ class solid_ROM:
         self.regressor.train(pres_coeff_tr, disp_coeff_tr)
         # self.saved_prs_cf_tr = pres_coeff_tr.copy()
         # self.saved_disp_cf_tr = disp_coeff_tr.copy()
+
+    def reject_outliers(self, data, m=8):
+        ids_ = np.max((np.abs(data - np.mean(data, axis=1).reshape((-1, 1)))), axis = 0) < m*np.std(data, axis = 0)
+        return data[:, ids_], ids_
 
     def pred(self, new_pres):
         """Solid ROM prediction

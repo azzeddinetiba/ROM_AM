@@ -248,7 +248,7 @@ class ROM:
                 self.snap_min = np.min(snaps, axis=1)
                 self.max_min = ((self.snap_max - self.snap_min)[:, np.newaxis])
                 self.max_min = np.where(np.isclose(
-                    self.max_min, 0), 1, self.max_min)
+                    self.max_min, 0, atol=1e-12), 1, self.max_min)
             else:
                 self.snap_max = np.max(
                     np.hstack((snaps, self.Y[:, -1].reshape((-1, 1)))), axis=1)
@@ -256,7 +256,7 @@ class ROM:
                     np.hstack((snaps, self.Y[:, -1].reshape((-1, 1)))), axis=1)
                 self.max_min = ((self.snap_max - self.snap_min)[:, np.newaxis])
                 self.max_min = np.where(np.isclose(
-                    self.max_min, 0), 1, self.max_min)
+                    self.max_min, 0, atol=1e-12), 1, self.max_min)
                 self.Y = (self.Y - self.snap_min[:, np.newaxis]) / self.max_min
             if self.to_copy:
                 self.snapshots = (
@@ -272,9 +272,9 @@ class ROM:
                     (np.hstack((snaps, self.Y[:, -1].reshape((-1, 1)))), np.hstack((self.Y_input, self.Y_input[:, -1][:, np.newaxis]))))
             self.snap_norms = np.linalg.norm(temp, axis=1)
             self.zeroIds = np.argwhere(np.isclose(
-                self.snap_norms, 0)).ravel()
+                self.snap_norms, 0, atol=1e-12)).ravel()
             self.snap_norms = np.where(np.isclose(
-                self.snap_norms, 0), 1, self.snap_norms)
+                self.snap_norms, 0, atol=1e-12), 1, self.snap_norms)
             if self.Y_input is not None:
                 self.Y_input = self.Y_input / \
                     self.snap_norms[self.nx::, np.newaxis]
@@ -321,11 +321,11 @@ class ROM:
                 return res * self.max_min + self.snap_min[:, np.newaxis]
             elif self.normalization == "norm":
                 if self.Y_input is not None:
-                    dirichletNorms = self.snap_norms[:self.nx, np.newaxis]
+                    dirichletNorms = self.snap_norms[:self.nx, np.newaxis].copy()
                     dirichletNorms[self.zeroIds] = 0.
                     return res * dirichletNorms
                 else:
-                    dirichletNorms = self.snap_norms[:, np.newaxis]
+                    dirichletNorms = self.snap_norms[:, np.newaxis].copy()
                     dirichletNorms[self.zeroIds] = 0.
                     return res * dirichletNorms
             elif self.normalization == "spec":
