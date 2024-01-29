@@ -321,11 +321,11 @@ class ROM:
                 return res * self.max_min + self.snap_min[:, np.newaxis]
             elif self.normalization == "norm":
                 if self.Y_input is not None:
-                    dirichletNorms = self.snap_norms[:self.nx, np.newaxis]
+                    dirichletNorms = self.snap_norms[:self.nx, np.newaxis].copy()
                     dirichletNorms[self.zeroIds] = 0.
                     return res * dirichletNorms
                 else:
-                    dirichletNorms = self.snap_norms[:, np.newaxis]
+                    dirichletNorms = self.snap_norms[:, np.newaxis].copy()
                     dirichletNorms[self.zeroIds] = 0.
                     return res * dirichletNorms
             elif self.normalization == "spec":

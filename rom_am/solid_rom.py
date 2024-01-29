@@ -1,6 +1,8 @@
 import numpy as np
 import time
 from rom_am.regressors.polynomialLassoRegressor import PolynomialLassoRegressor
+from rom_am.regressors.polynomialLassoDynamicalRegressor import PolynomialLassoDynamicalRegressor
+from rom_am.regressors.dynamicalRbfRegressor import DynamicalRBFRegressor
 from rom_am.regressors.polynomialRegressor import PolynomialRegressor
 from rom_am.regressors.rbfRegressor import RBFRegressor
 from rom_am.dimreducers.rom_am.podReducer import PodReducer
@@ -10,7 +12,7 @@ import pickle
 
 class solid_ROM:
 
-    def __init__(self,):
+    def __init__(self, is_dynamical=False):
         self.encoding_time = np.array([])
         self.regression_time = np.array([])
         self.decoding_time = np.array([])
@@ -20,6 +22,10 @@ class solid_ROM:
         self.norm_regr = False
         self.current_disp_coeff = None
         self.torch_model = None
+        if is_dynamical:
+            self.is_dynamical = True
+        else:
+            self.is_dynamical = False
 
     def train(self,
               pres_data,
@@ -34,7 +40,8 @@ class solid_ROM:
               norm_regr=[False, False],
               norm=["l2", "l2"],
               algs=["svd", "svd"],
-              to_copy=[True, True],):
+              to_copy=[True, True],
+              previous_disp_data=None):
         """Training the solid ROM model
 
         Parameters
@@ -131,6 +138,11 @@ class solid_ROM:
         self.dispReduc_model.train(used_disp_data, map_used=map_used, alg = algs[1], to_copy=to_copy[1])
         disp_coeff = self.dispReduc_model.reduced_data
 
+        if self.is_dynamical:
+            previous_disp_coeff = self.dispReduc_model.encode(previous_disp_data)
+        else:
+            previous_disp_coeff = None
+
         # ========= Reduction of the pressure data ==================
         if forcesReduc_model is None or forcesReduc_model == "POD":
             self.forcesReduc = PodReducer(latent_dim=rank_pres)
@@ -164,6 +176,9 @@ class solid_ROM:
 
                 disp_coeff = (disp_coeff - disp_coeff_min) / \
                     (disp_coeff_max_min)
+                if self.is_dynamical:
+                    previous_disp_coeff = (previous_disp_coeff - disp_coeff_min) / \
+                        (disp_coeff_max_min)
 
                 self.disp_coeff_max = disp_coeff_max
                 self.disp_coeff_min = disp_coeff_min
@@ -175,6 +190,9 @@ class solid_ROM:
 
                 disp_coeff = (disp_coeff - disp_coeff_mean) / \
                     (disp_coeff_nrm)
+                if self.is_dynamical:
+                    previous_disp_coeff = (previous_disp_coeff - disp_coeff_mean) / \
+                        (disp_coeff_nrm)
 
                 self.disp_coeff_mean = disp_coeff_mean
                 self.disp_coeff_nrm = disp_coeff_nrm
@@ -184,6 +202,9 @@ class solid_ROM:
 
                 disp_coeff = (disp_coeff - disp_coeff_mean) / \
                     (disp_coeff_std)
+                if self.is_dynamical:
+                    previous_disp_coeff = (previous_disp_coeff - disp_coeff_mean) / \
+                        (disp_coeff_std)
 
                 self.disp_coeff_mean = disp_coeff_mean
                 self.disp_coeff_std = disp_coeff_std
@@ -241,21 +262,33 @@ class solid_ROM:
             disp_coeff_tr = np.hstack(
                 (unus_disp_coeff, disp_coeff))
 
-        if regression_model is None or regression_model == "PolyLasso":
-            self.regressor = PolynomialLassoRegressor(
-                poly_degree=2, criterion='bic')
-        elif regression_model == "PolyRidge":
-            self.regressor = PolynomialRegressor()
-        elif regression_model == "RBF":
-            self.regressor = RBFRegressor()
+        if not self.is_dynamical:
+            if regression_model is None or regression_model == "PolyLasso":
+                self.regressor = PolynomialLassoRegressor(
+                    poly_degree=2, criterion='bic')
+            elif regression_model == "PolyRidge":
+                self.regressor = PolynomialRegressor()
+            elif regression_model == "RBF":
+                self.regressor = RBFRegressor()
+            else:
+                self.regressor = regression_model
         else:
-            self.regressor = regression_model
+            if regression_model is None or regression_model == "PolyDynamicalLasso":
+                self.regressor = PolynomialLassoDynamicalRegressor(
+                    poly_degree=2, criterion='bic')
+            elif regression_model == "RBF":
+                self.regressor = DynamicalRBFRegressor()
+            else:
+                self.regressor = regression_model
 
-        self.regressor.train(pres_coeff_tr, disp_coeff_tr)
+        if not self.is_dynamical:
+            self.regressor.train(pres_coeff_tr, disp_coeff_tr)
+        else:
+            self.regressor.train(pres_coeff_tr, disp_coeff_tr, previous_disp_coeff)
         # self.saved_prs_cf_tr = pres_coeff_tr.copy()
         # self.saved_disp_cf_tr = disp_coeff_tr.copy()
 
-    def pred(self, new_pres):
+    def pred(self, new_pres, previous_disp=None):
         """Solid ROM prediction
 
         Parameters
@@ -289,11 +322,29 @@ class solid_ROM:
                 pred_pres_coeff = (pred_pres_coeff -
                                    self.pres_coeff_mean) / self.pres_coeff_std
 
+        if self.is_dynamical:
+            self.dispReduc_model.check_encoder_in(previous_disp)
+            previous_disp_coeff = self.dispReduc_model.encode(previous_disp)
+            self.dispReduc_model.check_encoder_out(previous_disp_coeff)
+            if self.norm_regr[1]:
+                if self.norms[0] == "minmax":
+                    previous_disp_coeff = (previous_disp_coeff -
+                                    self.disp_coeff_min) / self.disp_coeff_max_min
+                elif self.norms[0] == "l2":
+                    previous_disp_coeff = (previous_disp_coeff -
+                                    self.disp_coeff_mean) / self.disp_coeff_nrm
+                elif self.norms[0] == "std":
+                    previous_disp_coeff = (previous_disp_coeff -
+                                    self.disp_coeff_mean) / self.disp_coeff_std
+
         # self.saved_pres_pred_coeff = pred_pres_coeff.copy()
         # ============== Regression predicts =====================
         t2 = time.time()
         self.regressor.check_predict_in(pred_pres_coeff)
-        res1 = self.regressor.predict(pred_pres_coeff)
+        if not self.is_dynamical:
+            res1 = self.regressor.predict(pred_pres_coeff)
+        else:
+            res1 = self.regressor.predict(pred_pres_coeff, previous_disp_coeff)
         self.regressor.check_predict_out(res1)
         t3 = time.time()
 
