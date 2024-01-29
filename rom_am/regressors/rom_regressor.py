@@ -9,7 +9,7 @@ class RomRegressor:
     def __init__(self) -> None:
         pass
 
-    def train(self, input_data, output_data):
+    def train(self, input_data, output_data, previous_input_data=None):
         """Training the regressor
 
         Parameters
@@ -19,6 +19,8 @@ class RomRegressor:
         output_data : numpy.ndarray
             Second Snapshot matrix data, of (Nout, m) size
             output data
+        previous_input_data : numpy.ndarray
+            Previous timestep Snapshot matrix data, of (Nout, m) size
 
         Returns
         ------
@@ -28,15 +30,22 @@ class RomRegressor:
                 ), "Training data has to have the same number of samples in input and output."
         self.input_dim = input_data.shape[0]
         self.output_dim = output_data.shape[0]
+        if previous_input_data is not None:
+            assert (previous_input_data.shape[1] == output_data.shape[1]
+                    ), "Training data has to have the same number of samples in input and previous snapshots."
+            assert (previous_input_data.shape[0] == self.output_dim
+                    ), "Previous snapshots should have the same dimension as the output points."
         pass
 
-    def predict(self, new_input,) -> np.ndarray:
+    def predict(self, new_input, previous_input=None) -> np.ndarray:
         """Regressor prediction
 
         Parameters
         ----------
         new_input  : numpy.ndarray
             New inputs matrix, of (Nin, m) size
+        previous_input  : numpy.ndarray
+            New previous snapshot point, of (Nout, m) size
 
         Returns
         ------
