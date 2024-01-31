@@ -16,7 +16,7 @@ class solid_ROM:
         self.encoding_time = np.array([])
         self.regression_time = np.array([])
         self.decoding_time = np.array([])
-        self.map_mat = None
+        self.map_used = None
         self.inverse_project_mat = None
         self.stored_disp_coeffs = []
         self.norm_regr = False
@@ -113,7 +113,7 @@ class solid_ROM:
         # ========= Separation of converged iterations and subiterations ==================
         unused_disp_data = None
         m = disp_data.shape[1]
-        self.map_mat = map_used
+        self.map_used = map_used
         assert (m == pres_data.shape[1])
         if ids is None:
             used_disp_data = disp_data
@@ -300,7 +300,7 @@ class solid_ROM:
         ids_ = np.max((np.abs(data - np.mean(data, axis=1).reshape((-1, 1)))), axis = 0) < m*np.std(data, axis = 0)
         return data[:, ids_], ids_
 
-    def pred(self, new_pres, previous_disp=None):
+    def pred(self, new_pres, previous_disp=None, alpha=None):
         """Solid ROM prediction
 
         Parameters
@@ -356,7 +356,7 @@ class solid_ROM:
         if not self.is_dynamical:
             res1 = self.regressor.predict(pred_pres_coeff)
         else:
-            res1 = self.regressor.predict(pred_pres_coeff, previous_disp_coeff)
+            res1 = self.regressor.predict(pred_pres_coeff, previous_disp_coeff, alpha=alpha)
         self.regressor.check_predict_out(res1)
         t3 = time.time()
 
@@ -373,7 +373,7 @@ class solid_ROM:
         self.dispReduc_model.check_decoder_in(res1)
         res = self.dispReduc_model.decode(res1)
         self.dispReduc_model.check_decoder_out(res)
-        if self.map_mat is not None:
+        if self.map_used is not None:
             self.current_disp_coeff = res1.copy()
         t5 = time.time()
 

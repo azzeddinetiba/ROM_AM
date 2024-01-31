@@ -37,7 +37,7 @@ class RomRegressor:
                     ), "Previous snapshots should have the same dimension as the output points."
         pass
 
-    def predict(self, new_input, previous_input=None) -> np.ndarray:
+    def predict(self, new_input, previous_input=None, alpha=None) -> np.ndarray:
         """Regressor prediction
 
         Parameters

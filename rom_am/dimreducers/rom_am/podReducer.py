@@ -12,7 +12,7 @@ class PodReducer(RomDimensionalityReducer):
     def __init__(self, latent_dim, ) -> None:
         super().__init__(latent_dim)
 
-    def train(self, data, map_used=None, normalize=True, center=True, alg = "svd", to_copy=True):
+    def train(self, data, map_used=None, normalize=True, center=True, alg="svd", to_copy=True):
 
         super().train(data, map_used)
 
@@ -31,12 +31,6 @@ class PodReducer(RomDimensionalityReducer):
         if map_used is not None:
             self.interface_dim = map_used.shape[0]
             self.map_mat = map_used
-            self.inverse_project_mat = self.map_mat @ self.rom.denormalize(
-                self.pod.modes)
-
-            if center:
-                self.mapped_mean_flow = self.map_mat @ self.rom.mean_flow.reshape(
-                    (-1, 1))
 
         """
         self.minmaxScaler = MinMaxScaler()
@@ -54,9 +48,9 @@ class PodReducer(RomDimensionalityReducer):
 
         interm = self.rom.normalize(self.rom.center(new_data))
         encoded_ = self.pod.project(interm)
-        #self._check_encode_nearness(encoded_)
-        #accurate_ = self._check_encode_accuracy(new_data, encoded_)
-        #if accurate_ is None:
+        # self._check_encode_nearness(encoded_)
+        # accurate_ = self._check_encode_accuracy(new_data, encoded_)
+        # if accurate_ is None:
         if False:
             return None
         else:
@@ -68,7 +62,8 @@ class PodReducer(RomDimensionalityReducer):
             interm = self._mapped_decode(new_data)
             if self.center:
                 interm = (
-                    interm + self.mapped_mean_flow)
+                    interm + self.rom.mean_flow[self.map_mat].reshape(
+                        (-1, 1)))
             return interm
 
         else:
@@ -80,7 +75,8 @@ class PodReducer(RomDimensionalityReducer):
         return POD()
 
     def _mapped_decode(self, new_data):
-        return self.inverse_project_mat @ new_data
+        return self.rom.denormalize(
+            self.pod.modes)[self.map_mat, :] @ new_data
 
     @property
     def reduced_data(self):
