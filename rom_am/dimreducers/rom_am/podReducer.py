@@ -34,6 +34,7 @@ class PodReducer(RomDimensionalityReducer):
             else:
                 self.interface_dim = len(np.argwhere(map_used))
             self.map_mat = map_used
+            self.mapped_modes = self.pod.modes[self.map_mat, :]
 
         """
         self.minmaxScaler = MinMaxScaler()
@@ -72,7 +73,7 @@ class PodReducer(RomDimensionalityReducer):
         return POD()
 
     def _mapped_decode(self, new_data):
-        return self.pod.modes[self.map_mat, :] @ new_data
+        return self.mapped_modes @ new_data
 
     @property
     def reduced_data(self):
