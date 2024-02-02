@@ -59,6 +59,7 @@ class ROM:
             normalization="norm",
             norm_info=None,
             to_copy=True,
+            to_copy_order='F',
             *args,
             **kwargs,):
         """Computes the data decomposition, training the model on the input data X.
@@ -121,15 +122,15 @@ class ROM:
 
         if to_copy:
             self.to_copy=True
-            self.snapshots=X.copy()
+            self.snapshots=X.copy(order=to_copy_order)
             snapshots=self.snapshots
         else:
             snapshots=X
         self.nx = X.shape[0]
         if "Y" in kwargs.keys():
-            self.Y = kwargs["Y"].copy()
+            self.Y = kwargs["Y"].copy(order=to_copy_order)
             if "Y_input" in kwargs.keys():
-                self.Y_input = kwargs["Y_input"].copy()
+                self.Y_input = kwargs["Y_input"].copy(order=to_copy_order)
         if center:
             self.center_ = center
             self._center(snapshots)
@@ -140,7 +141,7 @@ class ROM:
             self.normalization = normalization
             if self.norm_info is not None:
                 self.normalization = "spec"
-            self._normalize(snapshots)
+            self._normalize(self.center(snapshots))
         if "Y" in kwargs.keys():
             kwargs["Y"] = self.Y
             if "Y_input" in kwargs.keys():
@@ -303,7 +304,7 @@ class ROM:
                     np.repeat(self.norm_info[:, 0], self.norm_info[:, 1].astype(int))[
                         :, np.newaxis]
 
-    def denormalize(self, res):
+    def denormalize(self, res, ids=None):
         """denormalization of the input array
 
         Parameters
@@ -321,13 +322,16 @@ class ROM:
                 return res * self.max_min + self.snap_min[:, np.newaxis]
             elif self.normalization == "norm":
                 if self.Y_input is not None:
-                    dirichletNorms = self.snap_norms[:self.nx, np.newaxis].copy()
-                    dirichletNorms[self.zeroIds] = 0.
-                    return res * dirichletNorms
+                    res_ = res * self.snap_norms[:self.nx, np.newaxis]
+                    res_[self.zeroIds] = 0.
+                    return res_
                 else:
-                    dirichletNorms = self.snap_norms[:, np.newaxis].copy()
-                    dirichletNorms[self.zeroIds] = 0.
-                    return res * dirichletNorms
+                    if ids is None:
+                        res_ = res * self.snap_norms[:, np.newaxis]
+                        res_[self.zeroIds] = 0.
+                    else:
+                        res_ = res * self.snap_norms[ids, np.newaxis]
+                    return res_
             elif self.normalization == "spec":
                 return res * np.repeat(self.norm_info[:, 0], self.norm_info[:, 1].astype(int))[
                     :, np.newaxis]
@@ -357,7 +361,7 @@ class ROM:
         if self.to_copy:
             self.snapshots = self.center(snaps)
 
-    def decenter(self, res):
+    def decenter(self, res, ids=None):
         """Decenter the data on the input array
 
         Parameters
@@ -371,7 +375,10 @@ class ROM:
             the decentered data based on the mean of the input snapshots
         """
         try:
-            return res + self.mean_flow.reshape((-1, 1))
+            if ids is None:
+                return res + self.mean_flow.reshape((-1, 1))
+            else:
+                return res + self.mean_flow[ids].reshape((-1, 1))
         except AttributeError:
             return res
     def reconstruct(self, rank=None):

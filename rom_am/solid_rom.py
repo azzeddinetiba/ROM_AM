@@ -38,9 +38,12 @@ class solid_ROM:
               forcesReduc_model=None,
               dispReduc_model=None,
               norm_regr=[False, False],
+              norm_dimRed=[True, True],
+              center_dimRed=[True, True],
               norm=["l2", "l2"],
               algs=["svd", "svd"],
               to_copy=[True, True],
+              to_copy_order=['F', 'F'],
               remove_outliers=False,
               previous_disp_data=None):
         """Training the solid ROM model
@@ -94,16 +97,24 @@ class solid_ROM:
             Whether to normalize the inputs and outputs of the regression
             model. The normalization used is chosen by the `norm`argument
             Default : [True, True]
+        norm_dimRed  : list of 2 booleans, optional
+            Default : [True, True]
+        center_dimRed  : list of 2 booleans, optional
+            Default : [True, True]
         norm       : list of 2 strs, optional
             Type of normalization used ([inputs, outputs]).
             "minmax" for min-max normalization. "l2" for L2
             normalization. "std" for standardization.
             Default : ["minmax", "minmax"]
-        norm       : list of 2 strs, optional
+        algs       : list of 2 strs, optional
             Type of decomposition used ([inputs, outputs]).
             Whether to use the SVD on decomposition ("svd") or
             the eigenvalue problem on snaphot matrices ("snap")
             Default : ["svd", "svd"]
+        to_copy  : list of 2 booleans, optional
+            Default : [True, True]
+        to_copy_order  : list of 2 booleans, optional
+            Default : [True, True]
 
         Returns
         ------
@@ -136,11 +147,13 @@ class solid_ROM:
         else:
             self.dispReduc_model = dispReduc_model
 
-        self.dispReduc_model.train(used_disp_data, map_used=map_used, alg = algs[1], to_copy=to_copy[1])
+        self.dispReduc_model.train(used_disp_data, map_used=map_used,
+                                   alg=algs[1], to_copy=to_copy[1], center=center_dimRed[1], normalize=norm_dimRed[1], to_copy_order=to_copy_order[1])
         disp_coeff = self.dispReduc_model.reduced_data
 
         if self.is_dynamical:
-            previous_disp_coeff = self.dispReduc_model.encode(previous_disp_data)
+            previous_disp_coeff = self.dispReduc_model.encode(
+                previous_disp_data)
         else:
             previous_disp_coeff = None
 
@@ -152,7 +165,8 @@ class solid_ROM:
         else:
             self.forcesReduc = forcesReduc_model
 
-        self.forcesReduc.train(used_pres_data, alg = algs[0], to_copy=to_copy[0])
+        self.forcesReduc.train(used_pres_data, alg=algs[0], to_copy=to_copy[0],
+                               normalize=norm_dimRed[0], center=center_dimRed[0], to_copy_order=to_copy_order[0])
         pres_coeff = self.forcesReduc.reduced_data
 
         if ids is not None:
@@ -251,9 +265,6 @@ class solid_ROM:
                 unus_pres_coeff = (unus_pres_coeff -
                                    pres_coeff_min) / (pres_coeff_max_min)
 
-        # self.saved_pres_coeff = pres_coeff.copy()
-        # self.saved_disp_coeff = diameter_coeff.copy()
-
         # ========= Regression =========
         if ids is None:
             pres_coeff_tr = pres_coeff
@@ -292,12 +303,12 @@ class solid_ROM:
         if not self.is_dynamical:
             self.regressor.train(pres_coeff_tr, disp_coeff_tr)
         else:
-            self.regressor.train(pres_coeff_tr, disp_coeff_tr, previous_disp_coeff)
-        # self.saved_prs_cf_tr = pres_coeff_tr.copy()
-        # self.saved_disp_cf_tr = disp_coeff_tr.copy()
+            self.regressor.train(
+                pres_coeff_tr, disp_coeff_tr, previous_disp_coeff)
 
     def reject_outliers(self, data, m=8):
-        ids_ = np.max((np.abs(data - np.mean(data, axis=1).reshape((-1, 1)))), axis = 0) < m*np.std(data, axis = 0)
+        ids_ = np.max((np.abs(data - np.mean(data, axis=1).reshape((-1, 1)))),
+                      axis=0) < m*np.std(data, axis=0)
         return data[:, ids_], ids_
 
     def pred(self, new_pres, previous_disp=None, alpha=None):
@@ -341,24 +352,28 @@ class solid_ROM:
             if self.norm_regr[1]:
                 if self.norms[0] == "minmax":
                     previous_disp_coeff = (previous_disp_coeff -
-                                    self.disp_coeff_min) / self.disp_coeff_max_min
+                                           self.disp_coeff_min) / self.disp_coeff_max_min
                 elif self.norms[0] == "l2":
                     previous_disp_coeff = (previous_disp_coeff -
-                                    self.disp_coeff_mean) / self.disp_coeff_nrm
+                                           self.disp_coeff_mean) / self.disp_coeff_nrm
                 elif self.norms[0] == "std":
                     previous_disp_coeff = (previous_disp_coeff -
-                                    self.disp_coeff_mean) / self.disp_coeff_std
+                                           self.disp_coeff_mean) / self.disp_coeff_std
 
-        # self.saved_pres_pred_coeff = pred_pres_coeff.copy()
         # ============== Regression predicts =====================
         t2 = time.time()
         self.regressor.check_predict_in(pred_pres_coeff)
         if not self.is_dynamical:
             res1 = self.regressor.predict(pred_pres_coeff)
         else:
-            res1 = self.regressor.predict(pred_pres_coeff, previous_disp_coeff, alpha=alpha)
+            res1 = self.regressor.predict(
+                pred_pres_coeff, previous_disp_coeff, alpha=alpha)
         self.regressor.check_predict_out(res1)
         t3 = time.time()
+
+        # ============== Check if new point is close to seen data =====================
+        # self.dispReduc_model._check_encode_nearness(res1)
+        # res1 = self.dispReduc_model.correct_far_point(res1)
 
         # ============== Denormalize Displ. coefficients =====================
         if self.norm_regr[1]:

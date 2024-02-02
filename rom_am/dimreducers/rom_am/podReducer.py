@@ -12,7 +12,7 @@ class PodReducer(RomDimensionalityReducer):
     def __init__(self, latent_dim, ) -> None:
         super().__init__(latent_dim)
 
-    def train(self, data, map_used=None, normalize=True, center=True, alg="svd", to_copy=True):
+    def train(self, data, map_used=None, normalize=True, center=True, alg="svd", to_copy=True, to_copy_order='F'):
 
         super().train(data, map_used)
 
@@ -20,7 +20,7 @@ class PodReducer(RomDimensionalityReducer):
         rom = ROM(pod)
 
         rom.decompose(X=data, normalize=normalize, center=center,
-                      rank=self.latent_dim, alg=alg, to_copy=to_copy)
+                      rank=self.latent_dim, alg=alg, to_copy=to_copy, to_copy_order=to_copy_order)
 
         self.latent_dim = pod.kept_rank
         self.normalize = normalize
@@ -29,7 +29,10 @@ class PodReducer(RomDimensionalityReducer):
         self.pod = pod
 
         if map_used is not None:
-            self.interface_dim = map_used.shape[0]
+            if map_used.dtype == int:
+                self.interface_dim = map_used.shape[0]
+            else:
+                self.interface_dim = len(np.argwhere(map_used))
             self.map_mat = map_used
 
         """
@@ -60,14 +63,8 @@ class PodReducer(RomDimensionalityReducer):
 
         if self.map_mat is not None and not high_dim:
             interm = self._mapped_decode(new_data)
-            if self.center:
-                interm = (
-                    interm + self.rom.mean_flow[self.map_mat].reshape(
-                        (-1, 1)))
-            return interm
-
+            return self.rom.decenter(self.rom.denormalize(interm, self.map_mat), self.map_mat)
         else:
-
             interm = self.pod.inverse_project(new_data)
             return self.rom.decenter(self.rom.denormalize(interm))
 
@@ -75,8 +72,7 @@ class PodReducer(RomDimensionalityReducer):
         return POD()
 
     def _mapped_decode(self, new_data):
-        return self.rom.denormalize(
-            self.pod.modes)[self.map_mat, :] @ new_data
+        return self.pod.modes[self.map_mat, :] @ new_data
 
     @property
     def reduced_data(self):
