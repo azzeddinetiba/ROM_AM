@@ -13,6 +13,7 @@ class RomDimensionalityReducer:
         self.interface_dim = None
         self.tree = None
         self.hull = None
+        self.space_computed = False
         pass
 
     def train(self, data, map_used=None):
@@ -54,7 +55,7 @@ class RomDimensionalityReducer:
         """
         raise Exception('"encode" has to be implemented in the derived class!')
 
-    def decode(self, new_latent_data, high_dim=False) -> np.ndarray:
+    def decode(self, new_latent_data, high_dim=False, to_correct=False, *args, **kwargs) -> np.ndarray:
         """Training the regressor
 
         Parameters
@@ -75,7 +76,41 @@ class RomDimensionalityReducer:
             or (n, m) is self.map_mat is not None
 
         """
-        raise Exception('"decode" has to be implemented in the derived class!')
+        if self.space_computed and to_correct:
+            self.correct_point(new_latent_data, *args, **kwargs)
+        return self._decode(new_latent_data, high_dim)
+
+    def correct_point(self, new_latent_data, *args, **kwargs):
+        self._correct_point(new_latent_data, *args, **kwargs)
+
+    def _correct_point(self, new_latent_data, high_dim=False) -> np.ndarray:
+        """Corrector
+
+        """
+        raise Exception('"_correct_point" has to be implemented in the derived class!')
+
+    def _decode(self, new_latent_data, high_dim=False) -> np.ndarray:
+        """Training the regressor
+
+        Parameters
+        ----------
+        new_latent_data  : numpy.ndarray
+            Snapshot matrix of data, of (r, m) size
+        high_dim  : bool, optional
+            Whether or not to override the mapping and returning the
+            high dimensional space. Only considered when self.map_mat
+            is not None
+            Default : False
+
+        Returns
+        ------
+        highDim_data  : numpy.ndarray
+            Snapshot matrix of data,
+            of (N, m) size
+            or (n, m) is self.map_mat is not None
+
+        """
+        raise Exception('"_decode" has to be implemented in the derived class!')
 
     def check_decoder_in(self, new_latent_data):
         assert (new_latent_data.shape[0] == self.latent_dim

@@ -45,7 +45,8 @@ class solid_ROM:
               to_copy=[True, True],
               to_copy_order=['F', 'F'],
               remove_outliers=False,
-              previous_disp_data=None):
+              previous_disp_data=None,
+              compute_spaces=[False, False]):
         """Training the solid ROM model
 
         Parameters
@@ -148,7 +149,9 @@ class solid_ROM:
             self.dispReduc_model = dispReduc_model
 
         self.dispReduc_model.train(used_disp_data, map_used=map_used,
-                                   alg=algs[1], to_copy=to_copy[1], center=center_dimRed[1], normalize=norm_dimRed[1], to_copy_order=to_copy_order[1])
+                                   alg=algs[1], to_copy=to_copy[1], center=center_dimRed[1], normalize=norm_dimRed[1],
+                                   to_copy_order=to_copy_order[1],
+                                   compute_space=compute_spaces[1])
         disp_coeff = self.dispReduc_model.reduced_data
 
         if self.is_dynamical:
@@ -166,7 +169,8 @@ class solid_ROM:
             self.forcesReduc = forcesReduc_model
 
         self.forcesReduc.train(used_pres_data, alg=algs[0], to_copy=to_copy[0],
-                               normalize=norm_dimRed[0], center=center_dimRed[0], to_copy_order=to_copy_order[0])
+                               normalize=norm_dimRed[0], center=center_dimRed[0], to_copy_order=to_copy_order[0],
+                               compute_space=compute_spaces[0])
         pres_coeff = self.forcesReduc.reduced_data
 
         if ids is not None:
@@ -305,13 +309,14 @@ class solid_ROM:
         else:
             self.regressor.train(
                 pres_coeff_tr, disp_coeff_tr, previous_disp_coeff)
+        self.predicted_latent = []
 
     def reject_outliers(self, data, m=8):
         ids_ = np.max((np.abs(data - np.mean(data, axis=1).reshape((-1, 1)))),
                       axis=0) < m*np.std(data, axis=0)
         return data[:, ids_], ids_
 
-    def pred(self, new_pres, previous_disp=None, alpha=None):
+    def pred(self, new_pres, previous_disp=None, alpha=None, correct_space=False,  *args, **kwargs):
         """Solid ROM prediction
 
         Parameters
@@ -386,7 +391,9 @@ class solid_ROM:
 
         t4 = time.time()
         self.dispReduc_model.check_decoder_in(res1)
-        res = self.dispReduc_model.decode(res1)
+        self.predicted_latent.append(res1.copy())
+        res = self.dispReduc_model.decode(
+            res1, to_correct=correct_space, *args, **kwargs)
         self.dispReduc_model.check_decoder_out(res)
         if self.map_used is not None:
             self.current_disp_coeff = res1.copy()

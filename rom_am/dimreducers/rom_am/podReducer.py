@@ -11,8 +11,13 @@ class PodReducer(RomDimensionalityReducer):
 
     def __init__(self, latent_dim, ) -> None:
         super().__init__(latent_dim)
+        self.space_computed = False
+        self.ids_to_correct = None
+        self.corrected_points = []
+        self.far_points = []
 
-    def train(self, data, map_used=None, normalize=True, center=True, alg="svd", to_copy=True, to_copy_order='F'):
+    def train(self, data, map_used=None, normalize=True, center=True, alg="svd", to_copy=True,
+              to_copy_order='F', compute_space=False):
 
         super().train(data, map_used)
 
@@ -36,17 +41,19 @@ class PodReducer(RomDimensionalityReducer):
             self.map_mat = map_used
             self.mapped_modes = self.pod.modes[self.map_mat, :]
 
-        """
-        self.minmaxScaler = MinMaxScaler()
-        self.minmaxScaler.fit(self.pod.pod_coeff[:3, :].T)
-        self.tree = KDTree(self.minmaxScaler.transform(
-            self.pod.pod_coeff[:3, :].T))
-        self.hull = Delaunay(self.minmaxScaler.transform(
-            self.pod.pod_coeff[:3, :].T))
-        dists, _ = self.tree.query(self.minmaxScaler.transform(
-            self.pod.pod_coeff[:3, :].T), k=self.pod.pod_coeff.shape[1])
-        self.max_dist = dists.max()
-        """
+        if compute_space:
+            self.minmaxScaler = MinMaxScaler()
+            self.minmaxScaler.fit(self.pod.pod_coeff.T)
+            self.tree = KDTree(self.minmaxScaler.transform(
+                self.pod.pod_coeff.T))
+            # self.hull = Delaunay(self.minmaxScaler.transform(
+            #    self.pod.pod_coeff[:3, :].T))
+            self.meanScaledPoint = self.minmaxScaler.transform(
+                self.pod.pod_coeff.mean(axis=1).reshape((1, -1)))
+            dists, _ = self.tree.query(self.meanScaledPoint,
+                                       k=self.pod.pod_coeff.shape[1])
+            self.max_dist = dists.max()
+            self.space_computed = True
 
     def encode(self, new_data):
 
@@ -60,8 +67,21 @@ class PodReducer(RomDimensionalityReducer):
         else:
             return encoded_
 
-    def decode(self, new_data, high_dim=False):
+    def _correct_point(self, new_points, correc_coeff=0.2, cutoff=0.2):
+        dists_to_mean = np.linalg.norm(self.minmaxScaler.transform(
+            new_points.T) - self.meanScaledPoint, axis=1)
+        ids_to_correct = np.argwhere(
+            dists_to_mean > (1+cutoff) * self.max_dist).ravel()
+        self.ids_to_correct = ids_to_correct.copy()
+        if len(ids_to_correct) > 0:
+            warnings.warn("Warning, the new point is too far")
+            self.far_points.append(new_points[:, ids_to_correct].copy())
+            newScaledPoints = self.minmaxScaler.transform(new_points[:, ids_to_correct].T)
+            newScaledPoints += correc_coeff * (self.meanScaledPoint - newScaledPoints)
+            new_points[:, ids_to_correct] = self.minmaxScaler.inverse_transform(newScaledPoints).T
+            self.corrected_points.append(new_points[:, ids_to_correct].copy())
 
+    def _decode(self, new_data, high_dim=False):
         if self.map_mat is not None and not high_dim:
             interm = self._mapped_decode(new_data)
             return self.rom.decenter(self.rom.denormalize(interm, self.map_mat), self.map_mat)
