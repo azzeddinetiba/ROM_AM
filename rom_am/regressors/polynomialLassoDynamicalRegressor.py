@@ -32,7 +32,7 @@ class PolynomialLassoDynamicalRegressor(RomRegressor):
             self.nonzeroIds.append(np.argwhere(np.abs(
                 self.regr_model["multioutputregressor"].estimators_[i].coef_) > 1e-9)[:, 0])
 
-    def predict(self, new_input, previous_input):
+    def predict(self, new_input, previous_input, alpha=None):
 
         # Instead of self.regr_model.predict(new_input.T).T, the following is faster :
         polyFeatures = self.regr_model["columntransformer"].transform(
