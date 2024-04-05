@@ -38,7 +38,7 @@ class POD:
             the eigenvalue problem on snaphot matrices ("snap")
             Default : "svd"
         rank : None, int or float, optional
-            if rank = 0 or rank is None All the ranks are kept, 
+            if rank = 0 or rank is None All the ranks are kept,
             unless their singular values are zero
             if 0 < rank < 1, it is used as the percentage of
             the energy that should be kept, and the rank is
@@ -163,7 +163,7 @@ class POD:
             ranks kept for prediction: it should be a hard threshold integer
             and greater than the rank chose/computed in the decomposition
             phase. If None, the same rank already computed is used
-            Default : None 
+            Default : None
 
         Returns
         ----------
@@ -218,3 +218,9 @@ class POD:
         if self._pod_coeff is None:
             self._pod_coeff = np.diag(self.singvals) @ self.time
         return self._pod_coeff
+
+    def _truncate(self, new_dim):
+        self.modes = self.modes[:, :new_dim]
+        self._pod_coeff = self._pod_coeff[:new_dim, :]
+        self.time = self.time[:new_dim, :]
+        self.singvals = self.singvals[:new_dim]

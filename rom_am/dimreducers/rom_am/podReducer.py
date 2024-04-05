@@ -78,3 +78,7 @@ class PodReducer(RomDimensionalityReducer):
     @property
     def reduced_data(self):
         return self.pod.pod_coeff
+
+    def truncate(self, new_dim):
+        self.pod._truncate(new_dim)
+        self.latent_dim = new_dim
