@@ -45,6 +45,7 @@ class ROM:
         self.Y = None
         self.Y_input = None
         self._accuracy = None
+        self.to_copy=False
 
     def decompose(
             self,
@@ -57,6 +58,8 @@ class ROM:
             normalize=False,
             normalization="norm",
             norm_info=None,
+            to_copy=True,
+            to_copy_order='F',
             *args,
             **kwargs,):
         """Computes the data decomposition, training the model on the input data X.
@@ -71,7 +74,7 @@ class ROM:
             the eigenvalue problem on snaphot matrices ("snap")
             Default : "svd"
         rank : None, int or float, optional
-            if rank = 0 or rank is None All the ranks are kept, 
+            if rank = 0 or rank is None All the ranks are kept,
             unless their singular values are zero
             if 0 < rank < 1, it is used as the percentage of
             the energy that should be kept, and the rank is
@@ -100,8 +103,8 @@ class ROM:
             'norm_info' argument
             Default : "norm"
         norm_info : numpy.ndarray 2D
-            a 2D numpy array containing the value of norms each field will 
-            be divided on in the first column, the second column contains 
+            a 2D numpy array containing the value of norms each field will
+            be divided on in the first column, the second column contains
             the sizeof the field accoring to each value, the sum of the
             second column should be equal to the size of input data
 
@@ -117,15 +120,20 @@ class ROM:
 
         """
 
-        self.snapshots = X.copy()
+        if to_copy:
+            self.to_copy=True
+            self.snapshots=X.copy(order=to_copy_order)
+            snapshots=self.snapshots
+        else:
+            snapshots=X
         self.nx = X.shape[0]
         if "Y" in kwargs.keys():
-            self.Y = kwargs["Y"].copy()
+            self.Y = kwargs["Y"].copy(order=to_copy_order)
             if "Y_input" in kwargs.keys():
-                self.Y_input = kwargs["Y_input"].copy()
+                self.Y_input = kwargs["Y_input"].copy(order=to_copy_order)
         if center:
             self.center_ = center
-            self._center()
+            self._center(snapshots)
 
         if normalize:
             self.normalize_ = normalize
@@ -133,14 +141,14 @@ class ROM:
             self.normalization = normalization
             if self.norm_info is not None:
                 self.normalization = "spec"
-            self._normalize()
+            self._normalize(self.center(snapshots))
         if "Y" in kwargs.keys():
             kwargs["Y"] = self.Y
             if "Y_input" in kwargs.keys():
                 kwargs["Y_input"] = self.Y_input
 
         t0 = time.time()
-        u, s, vh = self.model.decompose(X=self.snapshots,
+        u, s, vh = self.model.decompose(X=self.normalize(self.center(X)),
                                         alg=alg,
                                         rank=rank,
                                         opt_trunc=opt_trunc,
@@ -148,6 +156,10 @@ class ROM:
                                         *args,
                                         **kwargs,)
 
+        # TODO if Compute accuracy
+        # TODO self.accuracy = self.get_accuracy()
+
+        self.snapshots = None # Release memory
         self.singvals = s
         self.modes = u
         self.time = vh
@@ -168,7 +180,7 @@ class ROM:
             ranks kept for prediction: it should be a hard threshold integer
             and greater than the rank chose/computed in the decomposition
             phase. If None, the same rank already computed is used
-            Default : None 
+            Default : None
 
         Returns
         ----------
@@ -202,7 +214,7 @@ class ROM:
             ranks kept for reconstruction: it should be a hard threshold integer
             and greater than the rank chose/computed in the decomposition
             phase. If None, the same rank already computed is used
-            Default : None 
+            Default : None
 
         Returns
         ----------
@@ -217,9 +229,9 @@ class ROM:
         """
         try:
             if self.normalization == "minmax":
-                return (data - self.snap_min[:, np.newaxis]) / self.max_min
+                return (data - self.snap_min[:self.nx, np.newaxis]) / self.max_min
             elif self.normalization == "norm":
-                return data / self.snap_norms[:, np.newaxis]
+                return data / self.snap_norms[:self.nx, np.newaxis]
             if self.Y is not None or self.Y_input is not None or self.normalization == "spec":
                 raise NotImplementedError(
                     "normalize() is only supported for 'minmax' and 'norm' normalizations, and only when one set of \
@@ -227,51 +239,62 @@ class ROM:
         except AttributeError:
             return data
 
-    def _normalize(self, Y=None):
+    def _normalize(self, snaps, Y=None):
         """normalization of the input snapshots
 
         """
         if self.normalization == "minmax":
             if self.Y is None:
-                self.snap_max = np.max(self.snapshots, axis=1)
-                self.snap_min = np.min(self.snapshots, axis=1)
+                self.snap_max = np.max(snaps, axis=1)
+                self.snap_min = np.min(snaps, axis=1)
                 self.max_min = ((self.snap_max - self.snap_min)[:, np.newaxis])
                 self.max_min = np.where(np.isclose(
-                    self.max_min, 0), 1, self.max_min)
+                    self.max_min, 0, atol=1e-12), 1, self.max_min)
             else:
                 self.snap_max = np.max(
-                    np.hstack((self.snapshots, self.Y[:, -1].reshape((-1, 1)))), axis=1)
+                    np.hstack((snaps, self.Y[:, -1].reshape((-1, 1)))), axis=1)
                 self.snap_min = np.min(
-                    np.hstack((self.snapshots, self.Y[:, -1].reshape((-1, 1)))), axis=1)
+                    np.hstack((snaps, self.Y[:, -1].reshape((-1, 1)))), axis=1)
                 self.max_min = ((self.snap_max - self.snap_min)[:, np.newaxis])
                 self.max_min = np.where(np.isclose(
-                    self.max_min, 0), 1, self.max_min)
+                    self.max_min, 0, atol=1e-12), 1, self.max_min)
                 self.Y = (self.Y - self.snap_min[:, np.newaxis]) / self.max_min
-            self.snapshots = (
-                self.snapshots - self.snap_min[:, np.newaxis]) / self.max_min
+            if self.Y_input is not None:
+                self.snap_max_input = np.max(self.Y_input, axis=1)
+                self.snap_min_input = np.min(self.Y_input, axis=1)
+                self.max_min_input = ((self.snap_max_input - self.snap_min_input)[:, np.newaxis])
+                self.max_min_input = np.where(np.isclose(
+                    self.max_min_input, 0, atol=1e-12), 1, self.max_min_input)
+                self.Y_input =  (self.Y_input - self.snap_min_input[:, np.newaxis]) / self.max_min_input
+            if self.to_copy:
+                self.snapshots = (
+                    self.snapshots - self.snap_min[:, np.newaxis]) / self.max_min
         elif self.normalization == "norm":
             if self.Y is None:
-                temp = self.snapshots
+                temp = snaps
             elif self.Y_input is None:
                 temp = np.hstack(
-                    (self.snapshots, self.Y[:, -1].reshape((-1, 1))))
+                    (snaps, self.Y[:, -1].reshape((-1, 1))))
             else:
                 temp = np.vstack(
-                    (np.hstack((self.snapshots, self.Y[:, -1].reshape((-1, 1)))), np.hstack((self.Y_input, self.Y_input[:, -1][:, np.newaxis]))))
+                    (np.hstack((snaps, self.Y[:, -1].reshape((-1, 1)))), np.hstack((self.Y_input, self.Y_input[:, -1][:, np.newaxis]))))
             self.snap_norms = np.linalg.norm(temp, axis=1)
             self.zeroIds = np.argwhere(np.isclose(
-                self.snap_norms, 0)).ravel()
+                self.snap_norms, 0, atol=1e-12)).ravel()
             self.snap_norms = np.where(np.isclose(
-                self.snap_norms, 0), 1, self.snap_norms)
+                self.snap_norms, 0, atol=1e-12), 1, self.snap_norms)
             if self.Y_input is not None:
                 self.Y_input = self.Y_input / \
                     self.snap_norms[self.nx::, np.newaxis]
                 self.Y = self.Y / self.snap_norms[:self.nx, np.newaxis]
-                self.snapshots = self.snapshots / \
-                    self.snap_norms[:self.nx, np.newaxis]
+
+                if self.to_copy:
+                    self.snapshots = self.snapshots / \
+                        self.snap_norms[:self.nx, np.newaxis]
             else:
-                self.snapshots = self.snapshots / \
-                    self.snap_norms[:, np.newaxis]
+                if self.to_copy:
+                    self.snapshots = self.snapshots / \
+                        self.snap_norms[:, np.newaxis]
                 if self.Y is not None:
                     self.Y = self.Y / self.snap_norms[:, np.newaxis]
         elif self.normalization == "spec":
@@ -283,37 +306,44 @@ class ROM:
                 self.Y = self.Y / \
                     np.repeat(self.norm_info[:, 0], self.norm_info[:, 1].astype(int))[
                         :, np.newaxis]
-            self.snapshots = self.snapshots / \
-                np.repeat(self.norm_info[:, 0], self.norm_info[:, 1].astype(int))[
-                    :, np.newaxis]
+            if self.to_copy:
+                self.snapshots = self.snapshots / \
+                    np.repeat(self.norm_info[:, 0], self.norm_info[:, 1].astype(int))[
+                        :, np.newaxis]
 
-    def denormalize(self, res):
+    def denormalize(self, res, ids=None):
         """denormalization of the input array
 
         Parameters
         ----------
         res: numpy.ndarray, size (N, m)
-            has the same axis 0 dimension as the input snapshots 
+            has the same axis 0 dimension as the input snapshots
 
         Returns
         ----------
             numpy.ndarray, size (N, m)
             the denormalized array based on the min and max of the input snapshots
         """
-        if self.normalization == "minmax":
-            return res * self.max_min + self.snap_min[:, np.newaxis]
-        elif self.normalization == "norm":
-            if self.Y_input is not None:
-                dirichletNorms = self.snap_norms[:self.nx, np.newaxis]
-                dirichletNorms[self.zeroIds] = 0.
-                return res * dirichletNorms
-            else:
-                dirichletNorms = self.snap_norms[:, np.newaxis]
-                dirichletNorms[self.zeroIds] = 0.
-                return res * dirichletNorms
-        elif self.normalization == "spec":
-            return res * np.repeat(self.norm_info[:, 0], self.norm_info[:, 1].astype(int))[
-                :, np.newaxis]
+        try:
+            if self.normalization == "minmax":
+                return res * self.max_min + self.snap_min[:, np.newaxis]
+            elif self.normalization == "norm":
+                if self.Y_input is not None:
+                    res_ = res * self.snap_norms[:self.nx, np.newaxis]
+                    res_[self.zeroIds] = 0.
+                    return res_
+                else:
+                    if ids is None:
+                        res_ = res * self.snap_norms[:, np.newaxis]
+                        res_[self.zeroIds] = 0.
+                    else:
+                        res_ = res * self.snap_norms[ids, np.newaxis]
+                    return res_
+            elif self.normalization == "spec":
+                return res * np.repeat(self.norm_info[:, 0], self.norm_info[:, 1].astype(int))[
+                    :, np.newaxis]
+        except AttributeError:
+            return res
 
     def center(self, data):
         """Center the data along time
@@ -324,34 +354,43 @@ class ROM:
         except AttributeError:
             return data
 
-    def _center(self,):
+    def _center(self, snaps):
         """Center the data along time
 
         """
         if self.Y is None:
-            self.mean_flow = self.snapshots.mean(axis=1)
+            self.mean_flow = snaps.mean(axis=1)
         else:
             self.mean_flow = np.hstack(
-                (self.snapshots, self.Y[:, -1].reshape((-1, 1)))).mean(axis=1)
+                (snaps, self.Y[:, -1].reshape((-1, 1)))).mean(axis=1)
             self.Y = self.center(self.Y)
 
-        self.snapshots = self.center(self.snapshots)
+        if self.Y_input is not None:
+            self.mean_flow_input = self.Y_input.mean(axis=1)
+            self.Y_input = self.Y_input - self.mean_flow_input[:, np.newaxis]
+        if self.to_copy:
+            self.snapshots = self.center(snaps)
 
-    def decenter(self, res):
+    def decenter(self, res, ids=None):
         """Decenter the data on the input array
 
         Parameters
         ----------
         res: numpy.ndarray, size (N, m)
-            has the same axis 0 dimension as the input snapshots 
+            has the same axis 0 dimension as the input snapshots
 
         Returns
         ----------
             numpy.ndarray, size (N, m)
             the decentered data based on the mean of the input snapshots
         """
-        return res + self.mean_flow.reshape((-1, 1))
-
+        try:
+            if ids is None:
+                return res + self.mean_flow.reshape((-1, 1))
+            else:
+                return res + self.mean_flow[ids].reshape((-1, 1))
+        except AttributeError:
+            return res
     def reconstruct(self, rank=None):
         return self.model.reconstruct(rank)
 
@@ -390,16 +429,16 @@ class ROM:
             the relative error of the ROM
         """
         if self.Y is None:
-            self._trained_on = self.snapshots
+            _trained_on = self.snapshots
         else:
-            self._trained_on = self.Y
+            _trained_on = self.Y
         if t is None:
             if self._accuracy is None:
                 try:
                     self._accuracy = self.model.accuracy
                 except AttributeError:
                     err = np.linalg.norm(self.reconstruct(
-                        rank=rank) - self._trained_on, axis=0)/np.linalg.norm(self._trained_on, axis=0)
+                        rank=rank) - _trained_on, axis=0)/np.linalg.norm(_trained_on, axis=0)
                     self._accuracy = err.sum()/err.shape[0]
             return self._accuracy
         else:
