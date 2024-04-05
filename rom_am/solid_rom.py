@@ -12,13 +12,14 @@ import pickle
 
 class solid_ROM:
 
-    def __init__(self, is_dynamical=False):
+    def __init__(self, is_dynamical=False, alpha = .5):
         self.encoding_time = np.array([])
         self.regression_time = np.array([])
         self.decoding_time = np.array([])
         self.map_used = None
         self.inverse_project_mat = None
         self.stored_disp_coeffs = []
+        self.stored_load_coeffs = []
         self.norm_regr = False
         self.current_disp_coeff = None
         self.torch_model = None
@@ -26,6 +27,10 @@ class solid_ROM:
             self.is_dynamical = True
         else:
             self.is_dynamical = False
+        self.previousRes = None
+        self.alpha = alpha
+        self.predLoadCoeffs = []
+        self.predDispCoeffs = []
 
     def train(self,
               pres_data,
@@ -45,7 +50,10 @@ class solid_ROM:
               to_copy=[True, True],
               to_copy_order=['F', 'F'],
               remove_outliers=False,
-              previous_disp_data=None):
+              previous_disp_data=None,
+              trained_forcesReduc = False,
+              trained_dispReduc = False,
+              ):
         """Training the solid ROM model
 
         Parameters
@@ -147,8 +155,9 @@ class solid_ROM:
         else:
             self.dispReduc_model = dispReduc_model
 
-        self.dispReduc_model.train(used_disp_data, map_used=map_used,
-                                   alg=algs[1], to_copy=to_copy[1], center=center_dimRed[1], normalize=norm_dimRed[1], to_copy_order=to_copy_order[1])
+        if not trained_dispReduc:
+            self.dispReduc_model.train(used_disp_data, map_used=map_used,
+                                    alg=algs[1], to_copy=to_copy[1], center=center_dimRed[1], normalize=norm_dimRed[1], to_copy_order=to_copy_order[1])
         disp_coeff = self.dispReduc_model.reduced_data
 
         if self.is_dynamical:
@@ -165,8 +174,9 @@ class solid_ROM:
         else:
             self.forcesReduc = forcesReduc_model
 
-        self.forcesReduc.train(used_pres_data, alg=algs[0], to_copy=to_copy[0],
-                               normalize=norm_dimRed[0], center=center_dimRed[0], to_copy_order=to_copy_order[0])
+        if not trained_forcesReduc:
+            self.forcesReduc.train(used_pres_data, alg=algs[0], to_copy=to_copy[0],
+                                normalize=norm_dimRed[0], center=center_dimRed[0], to_copy_order=to_copy_order[0])
         pres_coeff = self.forcesReduc.reduced_data
 
         if ids is not None:
@@ -350,13 +360,13 @@ class solid_ROM:
             previous_disp_coeff = self.dispReduc_model.encode(previous_disp)
             self.dispReduc_model.check_encoder_out(previous_disp_coeff)
             if self.norm_regr[1]:
-                if self.norms[0] == "minmax":
+                if self.norms[1] == "minmax":
                     previous_disp_coeff = (previous_disp_coeff -
                                            self.disp_coeff_min) / self.disp_coeff_max_min
-                elif self.norms[0] == "l2":
+                elif self.norms[1] == "l2":
                     previous_disp_coeff = (previous_disp_coeff -
                                            self.disp_coeff_mean) / self.disp_coeff_nrm
-                elif self.norms[0] == "std":
+                elif self.norms[1] == "std":
                     previous_disp_coeff = (previous_disp_coeff -
                                            self.disp_coeff_mean) / self.disp_coeff_std
 
@@ -369,6 +379,16 @@ class solid_ROM:
             res1 = self.regressor.predict(
                 pred_pres_coeff, previous_disp_coeff, alpha=alpha)
         self.regressor.check_predict_out(res1)
+        # self.predLoadCoeffs.append(pred_pres_coeff)
+        # np.save("./coSimData/predLoadCoeffs.npy", np.hstack(self.predLoadCoeffs))
+        # self.predDispCoeffs.append(res1)
+        # np.save("./coSimData/predDispCoeffs.npy", np.hstack(self.predDispCoeffs))
+        # if self.previousRes is not None:
+        #     if alpha is None:
+        #         alpha = self.alpha
+        #     print("\n -- RELAXINGG - - \n")
+        #     res1 = alpha * res1 + (1-alpha) * self.previousRes
+        # self.previousRes = res1.copy()
         t3 = time.time()
 
         # ============== Check if new point is close to seen data =====================
@@ -418,6 +438,31 @@ class solid_ROM:
 
     def return_big_disps(self):
         return self.dispReduc_model.decode(np.hstack(self.stored_disp_coeffs), high_dim=True)
+
+    def reduce_load(self, new_load):
+        pred_pres_coeff = self.forcesReduc.encode(new_load)
+        if self.norm_regr[0]:
+            if self.norms[0] == "minmax":
+                pred_pres_coeff = (pred_pres_coeff -
+                                    self.pres_coeff_min) / self.pres_coeff_max_min
+            elif self.norms[0] == "l2":
+                pred_pres_coeff = (pred_pres_coeff -
+                                    self.pres_coeff_mean) / self.pres_coeff_nrm
+            elif self.norms[0] == "std":
+                pred_pres_coeff = (pred_pres_coeff -
+                                    self.pres_coeff_mean) / self.pres_coeff_std
+        self.stored_load_coeffs.append(pred_pres_coeff.copy())
+
+    def return_big_strains(self):
+        res1 = self.regressor.predict(np.hstack(self.stored_load_coeffs))
+        if self.norm_regr[1]:
+            if self.norms[1] == "minmax":
+                res1 = (res1 * self.disp_coeff_max_min) + self.disp_coeff_min
+            elif self.norms[1] == "l2":
+                res1 = (res1 * self.disp_coeff_nrm) + self.disp_coeff_mean
+            elif self.norms[1] == "std":
+                res1 = (res1 * self.disp_coeff_std) + self.disp_coeff_mean
+        return self.dispReduc_model.decode(res1)
 
     def save(self, file_name):
         with open(file_name+'.pkl', 'wb') as outp:
