@@ -229,9 +229,9 @@ class ROM:
         """
         try:
             if self.normalization == "minmax":
-                return (data - self.snap_min[:, np.newaxis]) / self.max_min
+                return (data - self.snap_min[:self.nx, np.newaxis]) / self.max_min
             elif self.normalization == "norm":
-                return data / self.snap_norms[:, np.newaxis]
+                return data / self.snap_norms[:self.nx, np.newaxis]
             if self.Y is not None or self.Y_input is not None or self.normalization == "spec":
                 raise NotImplementedError(
                     "normalize() is only supported for 'minmax' and 'norm' normalizations, and only when one set of \
@@ -259,6 +259,13 @@ class ROM:
                 self.max_min = np.where(np.isclose(
                     self.max_min, 0, atol=1e-12), 1, self.max_min)
                 self.Y = (self.Y - self.snap_min[:, np.newaxis]) / self.max_min
+            if self.Y_input is not None:
+                self.snap_max_input = np.max(self.Y_input, axis=1)
+                self.snap_min_input = np.min(self.Y_input, axis=1)
+                self.max_min_input = ((self.snap_max_input - self.snap_min_input)[:, np.newaxis])
+                self.max_min_input = np.where(np.isclose(
+                    self.max_min_input, 0, atol=1e-12), 1, self.max_min_input)
+                self.Y_input =  (self.Y_input - self.snap_min_input[:, np.newaxis]) / self.max_min_input
             if self.to_copy:
                 self.snapshots = (
                     self.snapshots - self.snap_min[:, np.newaxis]) / self.max_min
@@ -358,6 +365,9 @@ class ROM:
                 (snaps, self.Y[:, -1].reshape((-1, 1)))).mean(axis=1)
             self.Y = self.center(self.Y)
 
+        if self.Y_input is not None:
+            self.mean_flow_input = self.Y_input.mean(axis=1)
+            self.Y_input = self.Y_input - self.mean_flow_input[:, np.newaxis]
         if self.to_copy:
             self.snapshots = self.center(snaps)
 
