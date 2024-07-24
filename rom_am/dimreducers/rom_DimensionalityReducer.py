@@ -115,8 +115,15 @@ class RomDimensionalityReducer:
         try:
             if self.hull.find_simplex(self.minmaxScaler.transform((encoded_[:3, :].T)))<0:
                 dist, _ = self.tree.query(self.minmaxScaler.transform((encoded_[:3, :].T)))
-                if dist > 0.2 * self.max_dist:
+                ratio_ = dist / self.max_dist
+                print("RATIO is , ", ratio_)
+                if ratio_ > 0.1:
                     warnings.warn("Warning, the new point is too far")
+                    return 0
+                else:
+                    return 0
+            else:
+                return 1
         except AttributeError:
             pass
 

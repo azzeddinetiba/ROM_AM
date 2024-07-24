@@ -36,7 +36,7 @@ class PodReducer(RomDimensionalityReducer):
             self.map_mat = map_used
             self.mapped_modes = self.pod.modes[self.map_mat, :]
 
-        """
+
         self.minmaxScaler = MinMaxScaler()
         self.minmaxScaler.fit(self.pod.pod_coeff[:3, :].T)
         self.tree = KDTree(self.minmaxScaler.transform(
@@ -46,7 +46,7 @@ class PodReducer(RomDimensionalityReducer):
         dists, _ = self.tree.query(self.minmaxScaler.transform(
             self.pod.pod_coeff[:3, :].T), k=self.pod.pod_coeff.shape[1])
         self.max_dist = dists.max()
-        """
+
 
     def encode(self, new_data):
 

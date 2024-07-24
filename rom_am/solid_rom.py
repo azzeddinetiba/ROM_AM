@@ -5,6 +5,7 @@ from rom_am.regressors.polynomialLassoDynamicalRegressor import PolynomialLassoD
 from rom_am.regressors.dynamicalRbfRegressor import DynamicalRBFRegressor
 from rom_am.regressors.polynomialRegressor import PolynomialRegressor
 from rom_am.regressors.rbfRegressor import RBFRegressor
+from rom_am.regressors.nnRegressor import NNRegressor
 from rom_am.dimreducers.rom_am.podReducer import PodReducer
 from rom_am.dimreducers.rom_am.quadManReducer import QuadManReducer
 import pickle
@@ -12,7 +13,7 @@ import pickle
 
 class solid_ROM:
 
-    def __init__(self, is_dynamical=False, alpha = .5):
+    def __init__(self, is_dynamical=False, alpha=.5):
         self.encoding_time = np.array([])
         self.regression_time = np.array([])
         self.decoding_time = np.array([])
@@ -51,8 +52,11 @@ class solid_ROM:
               to_copy_order=['F', 'F'],
               remove_outliers=False,
               previous_disp_data=None,
-              trained_forcesReduc = False,
-              trained_dispReduc = False,
+              trained_forcesReduc=False,
+              trained_dispReduc=False,
+              nn_file_name=None,
+              nn_layers=[40, 40, 20, 20, 4],
+              nn_activations=["Sigmoid", "Sigmoid", "Sigmoid", "Sigmoid", ""]
               ):
         """Training the solid ROM model
 
@@ -157,7 +161,7 @@ class solid_ROM:
 
         if not trained_dispReduc:
             self.dispReduc_model.train(used_disp_data, map_used=map_used,
-                                    alg=algs[1], to_copy=to_copy[1], center=center_dimRed[1], normalize=norm_dimRed[1], to_copy_order=to_copy_order[1])
+                                       center=center_dimRed[1], normalize=norm_dimRed[1])
         disp_coeff = self.dispReduc_model.reduced_data
 
         if self.is_dynamical:
@@ -175,8 +179,8 @@ class solid_ROM:
             self.forcesReduc = forcesReduc_model
 
         if not trained_forcesReduc:
-            self.forcesReduc.train(used_pres_data, alg=algs[0], to_copy=to_copy[0],
-                                normalize=norm_dimRed[0], center=center_dimRed[0], to_copy_order=to_copy_order[0])
+            self.forcesReduc.train(used_pres_data,
+                                   normalize=norm_dimRed[0], center=center_dimRed[0])
         pres_coeff = self.forcesReduc.reduced_data
 
         if ids is not None:
@@ -233,6 +237,14 @@ class solid_ROM:
 
                 self.disp_coeff_mean = disp_coeff_mean
                 self.disp_coeff_std = disp_coeff_std
+            elif norm[1] == "max":
+                disp_coeff_max = np.max(np.abs(disp_coeff), axis=1)[
+                    :, np.newaxis]
+                disp_coeff = (disp_coeff) / (disp_coeff_max)
+                if self.is_dynamical:
+                    previous_disp_coeff = (
+                        previous_disp_coeff) / (disp_coeff_max)
+                self.disp_coeff_max = disp_coeff_max
 
             self.norm_regr[1] = True
 
@@ -266,6 +278,11 @@ class solid_ROM:
 
                 self.pres_coeff_std = pres_coeff_std
                 self.pres_coeff_mean = pres_coeff_mean
+            elif norm[0] == "max":
+                pres_coeff_max = np.max(np.abs(pres_coeff), axis=1)[
+                    :, np.newaxis]
+                pres_coeff = (pres_coeff) / (pres_coeff_max)
+                self.pres_coeff_max = pres_coeff_max
 
             self.norm_regr[0] = True
 
@@ -299,6 +316,9 @@ class solid_ROM:
                 self.regressor = PolynomialRegressor()
             elif regression_model == "RBF":
                 self.regressor = RBFRegressor()
+            elif regression_model == "NN":
+                self.regressor = NNRegressor(
+                    file_name=nn_file_name, nn_layers=nn_layers, nn_activations=nn_activations)
             else:
                 self.regressor = regression_model
         else:
@@ -354,6 +374,8 @@ class solid_ROM:
             elif self.norms[0] == "std":
                 pred_pres_coeff = (pred_pres_coeff -
                                    self.pres_coeff_mean) / self.pres_coeff_std
+            elif self.norms[0] == "max":
+                pred_pres_coeff = (pred_pres_coeff) / self.pres_coeff_max
 
         if self.is_dynamical:
             self.dispReduc_model.check_encoder_in(previous_disp)
@@ -369,6 +391,9 @@ class solid_ROM:
                 elif self.norms[1] == "std":
                     previous_disp_coeff = (previous_disp_coeff -
                                            self.disp_coeff_mean) / self.disp_coeff_std
+                elif self.norms[1] == "max":
+                    previous_disp_coeff = (
+                        previous_disp_coeff) / self.disp_coeff_max
 
         # ============== Regression predicts =====================
         t2 = time.time()
@@ -403,6 +428,8 @@ class solid_ROM:
                 res1 = (res1 * self.disp_coeff_nrm) + self.disp_coeff_mean
             elif self.norms[1] == "std":
                 res1 = (res1 * self.disp_coeff_std) + self.disp_coeff_mean
+            elif self.norms[1] == "max":
+                res1 = (res1 * self.disp_coeff_max)
 
         t4 = time.time()
         self.dispReduc_model.check_decoder_in(res1)
@@ -444,13 +471,15 @@ class solid_ROM:
         if self.norm_regr[0]:
             if self.norms[0] == "minmax":
                 pred_pres_coeff = (pred_pres_coeff -
-                                    self.pres_coeff_min) / self.pres_coeff_max_min
+                                   self.pres_coeff_min) / self.pres_coeff_max_min
             elif self.norms[0] == "l2":
                 pred_pres_coeff = (pred_pres_coeff -
-                                    self.pres_coeff_mean) / self.pres_coeff_nrm
+                                   self.pres_coeff_mean) / self.pres_coeff_nrm
             elif self.norms[0] == "std":
                 pred_pres_coeff = (pred_pres_coeff -
-                                    self.pres_coeff_mean) / self.pres_coeff_std
+                                   self.pres_coeff_mean) / self.pres_coeff_std
+            elif self.norms[0] == "max":
+                pred_pres_coeff = (pred_pres_coeff) / self.pres_coeff_max
         self.stored_load_coeffs.append(pred_pres_coeff.copy())
 
     def return_big_strains(self):
@@ -462,8 +491,13 @@ class solid_ROM:
                 res1 = (res1 * self.disp_coeff_nrm) + self.disp_coeff_mean
             elif self.norms[1] == "std":
                 res1 = (res1 * self.disp_coeff_std) + self.disp_coeff_mean
+            elif self.norms[1] == "max":
+                res1 = res1 * self.disp_coeff_max
         return self.dispReduc_model.decode(res1)
 
     def save(self, file_name):
         with open(file_name+'.pkl', 'wb') as outp:
             pickle.dump(self, outp, pickle.HIGHEST_PROTOCOL)
+
+    def loadNNmodel(self, file_name):
+        self.regressor.loadNNmodel(file_name)
