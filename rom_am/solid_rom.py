@@ -161,7 +161,7 @@ class solid_ROM:
 
         if not trained_dispReduc:
             self.dispReduc_model.train(used_disp_data, map_used=map_used,
-                                       center=center_dimRed[1], normalize=norm_dimRed[1])
+                                       alg=algs[1], to_copy=to_copy[1], center=center_dimRed[1], normalize=norm_dimRed[1], to_copy_order=to_copy_order[1])
         disp_coeff = self.dispReduc_model.reduced_data
 
         if self.is_dynamical:
@@ -179,8 +179,8 @@ class solid_ROM:
             self.forcesReduc = forcesReduc_model
 
         if not trained_forcesReduc:
-            self.forcesReduc.train(used_pres_data,
-                                   normalize=norm_dimRed[0], center=center_dimRed[0])
+            self.forcesReduc.train(used_pres_data, alg=algs[0], to_copy=to_copy[0],
+                                   normalize=norm_dimRed[0], center=center_dimRed[0], to_copy_order=to_copy_order[0])
         pres_coeff = self.forcesReduc.reduced_data
 
         if ids is not None:
