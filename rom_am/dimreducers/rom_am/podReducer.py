@@ -36,7 +36,6 @@ class PodReducer(RomDimensionalityReducer):
             self.map_mat = map_used
             self.mapped_modes = self.pod.modes[self.map_mat, :]
 
-
         self.minmaxScaler = MinMaxScaler()
         self.minmaxScaler.fit(self.pod.pod_coeff[:3, :].T)
         self.tree = KDTree(self.minmaxScaler.transform(
@@ -47,18 +46,24 @@ class PodReducer(RomDimensionalityReducer):
             self.pod.pod_coeff[:3, :].T), k=self.pod.pod_coeff.shape[1])
         self.max_dist = dists.max()
 
+    def encode(self, new_data, high_dim=True):
 
-    def encode(self, new_data):
+        if high_dim or self.map_mat is None:
+            interm = self.rom.normalize(self.rom.center(new_data))
+            encoded_ = self.pod.project(interm)
+        else:
+            interm = self.rom.normalize(self.rom.center(
+                new_data, self.map_mat), self.map_mat)
+            encoded_ = self.mapped_modes.T @ interm
 
-        interm = self.rom.normalize(self.rom.center(new_data))
-        encoded_ = self.pod.project(interm)
+        # Future devs
         # self._check_encode_nearness(encoded_)
         # accurate_ = self._check_encode_accuracy(new_data, encoded_)
         # if accurate_ is None:
-        if False:
-            return None
-        else:
-            return encoded_
+        #     return None
+        # else:
+        #     return encoded_
+        return encoded_
 
     def decode(self, new_data, high_dim=False):
 

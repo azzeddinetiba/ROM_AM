@@ -223,7 +223,7 @@ class ROM:
         """
         return self.model.reconstruct(rank=rank)
 
-    def normalize(self, data):
+    def normalize(self, data, ids=None):
         """normalization of input data
 
         """
@@ -231,7 +231,10 @@ class ROM:
             if self.normalization == "minmax":
                 return (data - self.snap_min[:self.nx, np.newaxis]) / self.max_min
             elif self.normalization == "norm":
-                return data / self.snap_norms[:self.nx, np.newaxis]
+                if ids is None:
+                    return data / self.snap_norms[:self.nx, np.newaxis]
+                else:
+                    return data / self.snap_norms[ids, np.newaxis]
             if self.Y is not None or self.Y_input is not None or self.normalization == "spec":
                 raise NotImplementedError(
                     "normalize() is only supported for 'minmax' and 'norm' normalizations, and only when one set of \
@@ -345,12 +348,15 @@ class ROM:
         except AttributeError:
             return res
 
-    def center(self, data):
+    def center(self, data, ids=None):
         """Center the data along time
 
         """
         try:
-            return data - self.mean_flow.reshape((-1, 1))
+            if ids is None:
+                return data - self.mean_flow.reshape((-1, 1))
+            else:
+                return data - self.mean_flow[ids].reshape((-1, 1))
         except AttributeError:
             return data
 

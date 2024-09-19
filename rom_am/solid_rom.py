@@ -9,6 +9,7 @@ from rom_am.regressors.nnRegressor import NNRegressor
 from rom_am.dimreducers.rom_am.podReducer import PodReducer
 from rom_am.dimreducers.rom_am.quadManReducer import QuadManReducer
 import pickle
+import warnings
 
 
 class solid_ROM:
@@ -132,6 +133,13 @@ class solid_ROM:
         ------
 
         """
+
+        if to_copy[0] or to_copy[1]:
+            warnings.warn("`to_copy` parameter will be removed "
+                        "Copying the snapshots informations will be avoided for memory savings"
+                        "To use the future default and silence this warning "
+                        "we advise to pass `to_copy=[False, False]`. ",
+                        FutureWarning, stacklevel=1)
 
         # ========= Separation of converged iterations and subiterations ==================
         unused_disp_data = None

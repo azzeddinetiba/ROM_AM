@@ -17,14 +17,21 @@ class QuadManReducer(PodReducer):
     def _mapped_decode(self, new_data):
         return super()._mapped_decode(new_data) + self.mapped_Vbar @ self.pod._kron_x_sq(new_data)
 
-    def encode(self, new_data):
+    def encode(self, new_data, high_dim=True):
 
-        interm = self.rom.normalize(self.rom.center(new_data))
-        encoded_ = self.pod.modes.T @ interm
+        if high_dim or self.map_mat is None:
+            interm = self.rom.normalize(self.rom.center(new_data))
+            encoded_ = self.pod.modes.T @ interm
+        else:
+            interm = self.rom.normalize(self.rom.center(
+                new_data, self.map_mat), self.map_mat)
+            encoded_ = self.mapped_modes.T @ interm
+
+        # Future devs
         # self._check_encode_nearness(encoded_)
         # accurate_ = self._check_encode_accuracy(new_data, encoded_)
         # if accurate_ is None:
-        if False:
-            return None
-        else:
-            return encoded_
+        #     return None
+        # else:
+        #     return encoded_
+        return encoded_
