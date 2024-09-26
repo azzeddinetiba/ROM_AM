@@ -19,7 +19,7 @@ class PolynomialDynamicalRegressor(RomRegressor):
 
         self.regr_model = make_pipeline(ColumnTransformer(transformers=[
                 ('polynomialCoefficients', PolynomialFeatures(
-                    self.degree, include_bias=True), slice(0, self.stateDim)),
+                    self.poly_degree, include_bias=True), slice(0, self.stateDim)),
             ],
                 remainder='passthrough'), MinMaxScaler(),
                 Ridge(alpha=self.regul_alpha))
