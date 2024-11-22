@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+  <!-- Background -->
+  <rect width="300" height="300" fill="#f0f4f8" rx="30" ry="30"/>
+  
+  <!-- Stylized Network/Reduction Representation -->
+  <g transform="translate(50, 100)">
+    <!-- Larger nodes representing full dimensional space -->
+    <circle cx="0" cy="50" r="20" fill="#3182ce" opacity="0.7"/>
+    <circle cx="100" cy="0" r="20" fill="#3182ce" opacity="0.7"/>
+    <circle cx="100" cy="100" r="20" fill="#3182ce" opacity="0.7"/>
+    
+    <!-- Smaller nodes representing reduced space -->
+    <circle cx="200" cy="50" r="10" fill="#63b3ed" opacity="0.9"/>
+    <circle cx="230" cy="50" r="10" fill="#63b3ed" opacity="0.9"/>
+    
+    <!-- Connecting lines to show dimensionality reduction -->
+    <line x1="20" y1="50" x2="180" y2="50" stroke="#4a5568" stroke-width="3" stroke-dasharray="5,5"/>
+    <line x1="120" y1="0" x2="200" y2="50" stroke="#4a5568" stroke-width="3" stroke-dasharray="5,5"/>
+    <line x1="120" y1="100" x2="230" y2="50" stroke="#4a5568" stroke-width="3" stroke-dasharray="5,5"/>
+  </g>
+  
+  <!-- Package Name Text -->
+  <text x="150" y="250" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#2d3748">
+    rom_am
+  </text>
+</svg>
