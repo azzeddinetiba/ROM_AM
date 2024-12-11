@@ -9,7 +9,7 @@ class RomRegressor:
     def __init__(self) -> None:
         pass
 
-    def train(self, input_data, output_data, previous_input_data=None):
+    def train(self, input_data, output_data, previous_input_data=None, weights=None):
         """Training the regressor
 
         Parameters
