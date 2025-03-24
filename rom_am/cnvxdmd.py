@@ -1,8 +1,7 @@
 import numpy as np
 from rom_am.dmd import DMD
 from scipy.spatial import KDTree
-from scipy.optimize import nnls
-
+import utils
 
 class CnvxDMD:
     """
@@ -17,7 +16,7 @@ class CnvxDMD:
                   X,
                   params,
                   dt=None,):
-        """Training the Convex hull dynamic mode decomposition model 
+        """Training the Convex hull dynamic mode decomposition model
         using the input data X and the training parameters params
 
         Parameters
@@ -32,10 +31,10 @@ class CnvxDMD:
         References
         ----------
 
-        [1] Claire Dupont, Florian De Vuyst and Anne-Virginie Salsac, 
-        Reduced-order model of deformable microcapsules in a Stokes 
-        flow: presentation of a non-intrusive kinematics-consistent 
-        data-driven approach, Journal of Fluid Mechanics 
+        [1] Claire Dupont, Florian De Vuyst and Anne-Virginie Salsac,
+        Reduced-order model of deformable microcapsules in a Stokes
+        flow: presentation of a non-intrusive kinematics-consistent
+        data-driven approach, Journal of Fluid Mechanics
         (JFM), 2nd revision (2022).
 
         """
@@ -73,7 +72,7 @@ class CnvxDMD:
                 k=None,
                 method=0,
                 cutoff=1.):
-        """Predict the CnvxDMD solution on the prescribed time instants and 
+        """Predict the CnvxDMD solution on the prescribed time instants and
         the target aprameter value.
 
         Parameters
@@ -84,11 +83,11 @@ class CnvxDMD:
             Parameter value for prediction
         t1: float
             the value of the time instant of the first data snapshot
-            If 'method=1' is used and t1 indicates the time isntant 
+            If 'method=1' is used and t1 indicates the time isntant
             when the solution corresponds to 'init'
             Default 0.
         rank : None, int or float, optional
-            if rank = 0 or rank is None All the ranks are kept, 
+            if rank = 0 or rank is None All the ranks are kept,
             unless their singular values are zero
             if 0 < rank < 1, it is used as the percentage of
             the energy that should be kept, and the rank is
@@ -158,7 +157,7 @@ class CnvxDMD:
         _, ii = self.param_tree.query(mu.ravel(), k=k)
         new_snaps = self.data[ii, :, :]
 
-        weights = self.cnvx_nnls(mu, self.params[:, ii], mu=nnls_tikhonov)
+        weights = utils.cnvx_nnls(mu, self.params[:, ii], mu=nnls_tikhonov)
         weighted_snaps = np.dot(new_snaps.T, weights).T
 
         # DMD Decomposition
@@ -167,46 +166,3 @@ class CnvxDMD:
                                        alg=alg, dt=self.dt, rank=rank, opt_trunc=opt_trunc, tikhonov=tikhonov, sorting=sorting)
 
         return dmd_model.predict(t, t1=t1, method=method, rank=rank_pred, stabilize=stabilize, init=init, cutoff=cutoff)
-
-    def cnvx_nnls(self, z, Z, ksi=1e5, mu=None):
-        """Solving a non negative linear square problem
-        min || Z w - z ||
-        with the constraint of w_i > 1 for all i
-        This uses scipy.optimize 's nnls function
-
-        Parameters
-        ----------
-        z : numpy.ndarray
-            Right hand vector, of shape (k, 1)
-        Z : numpy.ndarray
-            Matrix Z as shown above, of shape (k, p)
-        mu: float
-            Value of Penalization parameter ksi_ to enforce \Sum w_i = 1 
-            where ksi_ = ksi * tr(Z.T Z)/dim(w)
-            Default : 1e5
-        mu: None or float
-            Value of Tikhonov regularization parameter, thus solving 
-            min || Z w - z || + lambda || w ||
-            where lambda = mu * tr(Z.T Z)/dim(w)
-            Default : None
-        Returns
-        ----------
-        w : numpy.ndarray, size (p, )
-            solution of the constrained nnls problem
-
-        """
-
-        k = Z.shape[1]
-        ksi_ = ksi * np.trace(Z.T @ Z)/k
-
-        Zaug = np.vstack((Z, np.sqrt(ksi_) * np.ones((1, k))))
-        zaug = np.vstack((z, np.array([[np.sqrt(ksi_)]])))
-
-        if mu is not None:
-            mu_ = mu * np.trace(Zaug.T @ Zaug)/k
-            Zaug = np.vstack((Zaug, mu * np.eye(k+1)))
-            zaug = np.vstack((zaug, np.zeros((k+1, 1))))
-
-        w, _ = nnls(Zaug, zaug.ravel())
-
-        return w

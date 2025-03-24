@@ -3,15 +3,20 @@ import collections
 from rom_am.regressors.polynomialRegressor import PolynomialRegressor
 from rom_am.dimreducers.rom_DimensionalityReducer import RomDimensionalityReducer
 from rom_am.dimreducers.rom_am.podReducer import PodReducer
+from rom_am.dimreducers.rom_am.manifReducer import ManifInterpReducer
 from rom_am.regressors.rbfRegressor import RBFRegressor
 from rom_am.regressors.polynomialDynamicalRegressor import PolynomialDynamicalRegressor
 from warnings import warn
+from . import utils
 import pickle
+import copy
+from scipy.spatial import KDTree
+from sklearn.preprocessing import MinMaxScaler
 
 
 class FluidSurrog:
 
-    def __init__(self, maxLen=6900, reTrainThres=240):
+    def __init__(self, maxLen=6900, reTrainThres=240, parametric=False):
         self.trainIn = collections.deque(maxlen=maxLen)
         self.trainOut = collections.deque(maxlen=maxLen)
         self.maxLen = maxLen
@@ -24,6 +29,12 @@ class FluidSurrog:
         self._disp_latent_dim = None
         self._load_latent_dim = None
         self.weights = False
+        self.param_encoder = None
+        self.param_decoder = None
+        self.param_regressor = None
+        self.multiple_regressor = None
+        self.single_regressor = None
+        self._p = None
 
     def sigmoid(self, x, n=1):
         s = int(n/2)
@@ -34,11 +45,55 @@ class FluidSurrog:
 
     def train(self, dispData, fluidPrevData, fluidData, input_u=None, kernel='thin_plate_spline', smoothing=9.5e-2,
               rank_pres=.9999, rank_disp=.9999, degree=2, solidReduc: RomDimensionalityReducer = None, epsilon=1.,
-              norm=[True, True], center=[True, True], norm_regr="max", params=None, weights=None):
+              norm=[True, True], center=[True, True], norm_regr="max", params=None, weights=None, param_encoder=False,
+              param_decoder=False, param_regressor=False, multiple_param_regressor=False):
+
+        self.single_regressor = True
+        warning_text = "The data matrix should be of shape (p, N, m) with p the number of parameters"
+        if multiple_param_regressor:
+            self._p = params.shape[1]
+            self.multiple_regressor = True
+            assert (multiple_param_regressor !=
+                    param_regressor), "Either a signle regressor or multiple regressors"
+            self.single_regressor = False
+            assert (isinstance(dispData, list) and isinstance(
+                fluidPrevData, list)), warning_text
+            assert (len(dispData) == self._p and len(
+                fluidPrevData) == self._p), warning_text
+        if param_decoder or param_encoder or param_regressor:
+            self.param_decoder = param_decoder
+            self.param_encoder = param_decoder
+            self.param_regressor = param_regressor
+            if param_encoder:
+                assert (isinstance(dispData, list)), warning_text
+                assert (len(dispData) == self._p and self._p ==
+                        self._p), warning_text
+            if param_decoder:
+                assert (isinstance(fluidData, list) and isinstance(
+                    fluidPrevData, list)), warning_text
+                assert (len(fluidData) == self._p and len(
+                    fluidPrevData) == self._p), warning_text
+
+
         print(" ----- Load Reduction -----")
-        self.reducLoad = PodReducer(latent_dim=rank_pres)
-        self.reducLoad.train(fluidData, normalize=norm[0],
-                             center=center[0], to_copy=False, alg="svd",)
+        if self.param_decoder:
+            self.reducLoad = ManifInterpReducer()
+            reducLoadLocal = []
+            for i in range(len(fluidData)):
+                reducLoadLocal_ = PodReducer(latent_dim=rank_pres)
+                reducLoadLocal_.train(fluidData[i], normalize=norm[0],
+                                    center=center[0], to_copy=False, alg="svd",)
+                reducLoadLocal.append(reducLoadLocal_)
+            self.reducLoad.train(reducLoadLocal, params)
+
+        else:
+            if isinstance(fluidData, list):
+                fluidData_ = np.hstack(fluidData)
+            else:
+                fluidData_ = fluidData
+            self.reducLoad = PodReducer(latent_dim=rank_pres)
+            self.reducLoad.train(fluidData_, normalize=norm[0],
+                                center=center[0], to_copy=False, alg="svd",)
 
         print(" ----- Displacement Reduction -----")
         if solidReduc is not None:
@@ -46,32 +101,73 @@ class FluidSurrog:
             reducDisp = solidReduc
             self._disp_latent_dim = reducDisp.latent_dim
         else:
+            if isinstance(dispData, list):
+                dispData_ = np.hstack(dispData)
+            else:
+                dispData_ = dispData
             self.reducDisp = PodReducer(latent_dim=rank_disp)
-            self.reducDisp.train(dispData, normalize=norm[1],
+            self.reducDisp.train(dispData_, normalize=norm[1],
                                  center=center[1], to_copy=False, alg="svd",)
             reducDisp = self.reducDisp
 
         print(" ----- Regression -----")
-        input_ = np.vstack((reducDisp.encode(dispData, high_dim=False),
-                           self.reducLoad.encode(fluidPrevData)))
-        if params is not None:
-            input_ = np.vstack((input_, params))
-        if input_u is not None:
-            input_ = np.vstack((input_, input_u))
+        if self.multiple_regressor:
+            self.regressor = []
+            self.trainIn = []
+            self.trainOut = []
+            self._k = params.shape[0]
+            self.params = params.copy()
 
-        # Store for later updates
-        for i in range(input_.shape[1]):
-            self.trainIn.appendleft(input_[:, [i]])
-            self.trainOut.appendleft(self.reducLoad.reduced_data[:, [i]])
+            for i in range(self._p):
+                trainIn = collections.deque(maxlen=self.maxLen)
+                trainOut = collections.deque(maxlen=self.maxLen)
+                input_ = np.vstack((reducDisp.encode(dispData[i], high_dim=False),
+                                self.reducLoad.encode(fluidPrevData[i])))
+                if kernel == "poly":
+                    regressor = PolynomialDynamicalRegressor(
+                        smoothing, degree, self.reducLoad.latent_dim)
+                elif kernel == "polyC":
+                    regressor = PolynomialRegressor(smoothing, degree, True, norm = norm_regr)
+                else:
+                    regressor = RBFRegressor(kernel, epsilon, smoothing, degree, norm = norm_regr)
+                regressor.train(input_, self.reducLoad.encode(fluidData[i]), weights)
+                self.regressor.append(copy.deepcopy(regressor))
+                # Store for later updates
+                for j in range(input_.shape[1]):
+                    trainIn.appendleft(input_[:, [j]])
+                    trainOut.appendleft(self.reducLoad.encode(fluidData[i])[:, j])
+                self.trainIn.append(copy.deepcopy(trainIn))
+                self.trainOut.append(copy.deepcopy(trainOut))
 
-        if kernel == "poly":
-            self.regressor = PolynomialDynamicalRegressor(
-                smoothing, degree, self.reducLoad.latent_dim)
-        elif kernel == "polyC":
-            self.regressor = PolynomialRegressor(smoothing, degree, True, norm = norm_regr)
-        else:
-            self.regressor = RBFRegressor(kernel, epsilon, smoothing, degree, norm = norm_regr)
-        self.regressor.train(input_, self.reducLoad.reduced_data, weights)
+
+            scaleTree = MinMaxScaler()
+            scaleTree.fit(params.T)
+            self.scaleTree = scaleTree
+            self.param_tree = KDTree(scaleTree.transform(params.T))
+
+
+
+        if self.single_regressor:
+            input_ = np.vstack((reducDisp.encode(dispData, high_dim=False),
+                            self.reducLoad.encode(fluidPrevData)))
+            if self.param_regressor:
+                input_ = np.vstack((input_, params))
+            if input_u is not None:
+                input_ = np.vstack((input_, input_u))
+
+            # Store for later updates
+            for i in range(input_.shape[1]):
+                self.trainIn.appendleft(input_[:, [i]])
+                self.trainOut.appendleft(self.reducLoad.reduced_data[:, [i]])
+
+            if kernel == "poly":
+                self.regressor = PolynomialDynamicalRegressor(
+                    smoothing, degree, self.reducLoad.latent_dim)
+            elif kernel == "polyC":
+                self.regressor = PolynomialRegressor(smoothing, degree, True, norm = norm_regr)
+            else:
+                self.regressor = RBFRegressor(kernel, epsilon, smoothing, degree, norm = norm_regr)
+            self.regressor.train(input_, self.reducLoad.reduced_data, weights)
 
     def augmentData(self, newdispData, newfluidPrevData, newfluidData, current_t=-1, params = None, solidReduc: RomDimensionalityReducer = None):
         assert (
@@ -106,7 +202,7 @@ class FluidSurrog:
             weights = None
         self.regressor.train(np.hstack(self.trainIn), np.hstack(self.trainOut), weights=weights)
 
-    def predict(self, newDisp, newPrevLoad, input_u=None, solidReduc: RomDimensionalityReducer = None, params=None):
+    def predict(self, newDisp, newPrevLoad, input_u=None, solidReduc: RomDimensionalityReducer = None, params=None, k=None, nnls_tikhonov=None):
         assert (
             solidReduc is not None or self.reducDisp is not None), "A displacement Encoder is not available"
         if solidReduc is not None:
@@ -115,14 +211,27 @@ class FluidSurrog:
             coeffDisp = self.reducDisp.encode(newDisp, high_dim=False)
         xTest = np.vstack((coeffDisp, self.reducLoad.encode(newPrevLoad)))
 
-        if params is not None:
-            xTest = np.vstack((xTest, params))
+        if not self.multiple_regressor:
+            if params is not None:
+                xTest = np.vstack((xTest, params))
 
-        if input_u is not None:
-            xTest = np.vstack((xTest, input_u))
+            if input_u is not None:
+                xTest = np.vstack((xTest, input_u))
 
-        LoadReconsCoeff = self.regressor.predict(xTest)
-        predicted_ = self.reducLoad.decode(LoadReconsCoeff)
+            LoadReconsCoeff = self.regressor.predict(xTest)
+            predicted_ = self.reducLoad.decode(LoadReconsCoeff)
+        else:
+            if k is None:
+                k = self._k + 1
+            _, ii = self.param_tree.query((self.scaleTree.transform(params.T).T).ravel(), k=k)
+            new_preds = np.empty((k, self.reducLoad.latent_dim, newDisp.shape[1]))
+            for i in range(len(ii)):
+                new_preds[i, :, :] = self.regressor[ii[i]].predict(xTest)
+            weights = utils.cnvx_nnls(self.scaleTree.transform(params.T).T,
+                                      self.scaleTree.transform(self.params[:, ii].T).T, mu=nnls_tikhonov)
+            print(weights)
+            print(self.params[:, ii])
+            predicted_ = self.reducLoad.decode(np.dot(new_preds.T, weights).T)
 
         return predicted_
 

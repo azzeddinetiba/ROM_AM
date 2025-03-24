@@ -13,6 +13,7 @@ class RomDimensionalityReducer:
         self.interface_dim = None
         self.tree = None
         self.hull = None
+        self.parametric = False
         pass
 
     def train(self, data, map_used=None):

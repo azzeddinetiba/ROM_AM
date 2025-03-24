@@ -6,6 +6,7 @@ from rom_am.pod import POD
 from rom_am.dmd import DMD
 from rom_am.hodmd import HODMD
 from copy import deepcopy
+import utils
 
 
 class ManDMD:
@@ -13,39 +14,6 @@ class ManDMD:
     def __init__(self) -> None:
         self.exp = False
         self.is_Partitioned = False
-
-    def log_A(self, A, At):
-        if self.exp:
-            return logm(At @ np.linalg.inv(A))
-        else:
-            return At - A
-
-    def exp_A(self, A, At):
-        if self.exp:
-            return expm(At) @ A
-        else:
-            return A + At
-
-    def log_U(self, U, Ut):
-
-        N = U.shape[0]
-
-        prod = POD()
-        u, _, rh = prod.decompose(Ut.T @ U,)
-        procr = np.linalg.multi_dot((Ut, u, rh))
-        L = (np.eye(N) - U @ U.T) @ (procr)
-
-        prod2 = POD()
-        q, sig, vh = prod2.decompose(L, thin=True)
-
-        return np.linalg.multi_dot((q, np.diag(np.arcsin(sig)), vh))
-
-    def exp_U(self, U, delt):
-
-        prod = POD()
-        q, sig, vh = prod.decompose(delt, thin=True)
-
-        return np.linalg.multi_dot((U, vh.T, np.diag(np.cos(sig)), vh)) + np.linalg.multi_dot((q, np.diag(np.sin(sig)), vh))
 
     def decompose(self,
                   X,
@@ -62,8 +30,8 @@ class ManDMD:
                   iref=0,
                   method=2,
                   exp=False):
-        """Training the dynamic mode decomposition with manifold 
-        interpolation using the input data X and the training 
+        """Training the dynamic mode decomposition with manifold
+        interpolation using the input data X and the training
         parameters params
 
         Parameters
@@ -79,7 +47,7 @@ class ManDMD:
             the eigenvalue problem on snaphot matrices ("snap")
             Default : "svd"
         rank : None, int or float, optional
-            if rank = 0 or rank is None All the ranks are kept, 
+            if rank = 0 or rank is None All the ranks are kept,
             unless their singular values are zero
             if 0 < rank < 1, it is used as the percentage of
             the energy that should be kept, and the rank is
@@ -148,8 +116,8 @@ class ManDMD:
                                            alg=alg, dt=dt, rank=rank, opt_trunc=opt_trunc, tikhonov=tikhonov, sorting=sorting)
             b = dmd_model._compute_amplitudes(method=2)
 
-            stacked_Ulog[i, :, :] = self.log_U(ref_U, dmd_model.modes)
-            stacked_Alog[i, :, :] = self.log_A(ref_A, dmd_model.A_tilde)
+            stacked_Ulog[i, :, :] = utils.log_U(ref_U, dmd_model.modes)
+            stacked_Alog[i, :, :] = utils.log_A(ref_A, dmd_model.A_tilde)
             if method == 2 or method == 4:
                 stacked_b[i, :] = b
             if method == 4:
@@ -172,7 +140,7 @@ class ManDMD:
         return u, s, vh
 
     def predict(self, t, mu, t1, rank=None, stabilize=False, method=0, init=None, cutoff=1.):
-        """Predict the parDMD solution on the prescribed time instants and 
+        """Predict the parDMD solution on the prescribed time instants and
         the target aprameter value.
 
         Parameters
@@ -187,7 +155,7 @@ class ManDMD:
             ranks kept for prediction: it should be a hard threshold integer
             and greater than the rank chose/computed in the decomposition
             phase. If None, the same rank already computed is used
-            Default : None 
+            Default : None
 
         Returns
         ----------
@@ -198,9 +166,9 @@ class ManDMD:
         given_b = False
         b = None
         phi = None
-        U_pred = self.exp_U(self.ref_U, self.f_U(mu.T)[0, :, :])
+        U_pred = utils.exp_U(self.ref_U, self.f_U(mu.T)[0, :, :])
 
-        A_pred = self.exp_A(self.ref_A, self.f_A(mu.T)[0, :, :])
+        A_pred = utils.exp_A(self.ref_A, self.f_A(mu.T)[0, :, :])
         if method == 2 or method == 4:
             b = self.f_b(mu.T)[0, :]
         if method == 4 or method == 14:
