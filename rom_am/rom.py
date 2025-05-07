@@ -60,6 +60,8 @@ class ROM:
             norm_info=None,
             to_copy=True,
             to_copy_order='F',
+            precomp_mean=None,
+            precomp_std=None,
             *args,
             **kwargs,):
         """Computes the data decomposition, training the model on the input data X.
@@ -134,6 +136,9 @@ class ROM:
         if center:
             self.center_ = center
             self._center(snapshots)
+        if precomp_mean is not None:
+            self.center_ = True
+            self.mean_flow = precomp_mean.copy()
 
         if normalize:
             self.normalize_ = normalize
@@ -142,6 +147,15 @@ class ROM:
             if self.norm_info is not None:
                 self.normalization = "spec"
             self._normalize(self.center(snapshots))
+        if precomp_std is not None:
+            self.normalize_ = True
+            self.normalization = "norm"
+            self.snap_norms = precomp_std.copy()
+            self.zeroIds = np.argwhere(np.isclose(
+                self.snap_norms, 0, atol=1e-12)).ravel()
+            self.snap_norms = np.where(np.isclose(
+                self.snap_norms, 0, atol=1e-12), 1, self.snap_norms)
+
         if "Y" in kwargs.keys():
             kwargs["Y"] = self.Y
             if "Y_input" in kwargs.keys():
@@ -235,6 +249,11 @@ class ROM:
                     return data / self.snap_norms[:self.nx, np.newaxis]
                 else:
                     return data / self.snap_norms[ids, np.newaxis]
+            elif self.normalization == "max":
+                if ids is None:
+                    return data / self.snap_max[:self.nx, :]
+                else:
+                    return data / self.snap_max[ids, :]
             if self.Y is not None or self.Y_input is not None or self.normalization == "spec":
                 raise NotImplementedError(
                     "normalize() is only supported for 'minmax' and 'norm' normalizations, and only when one set of \
@@ -272,6 +291,27 @@ class ROM:
             if self.to_copy:
                 self.snapshots = (
                     self.snapshots - self.snap_min[:, np.newaxis]) / self.max_min
+        if self.normalization == "max":
+            if self.Y is None:
+                self.snap_max = np.max(np.abs(snaps), axis=1)[:, np.newaxis]
+                self.zeroIds = np.argwhere(np.isclose(
+                    self.snap_max, 0, atol=1e-12)).ravel()
+                self.snap_max = np.where(np.isclose(
+                    self.snap_max, 0, atol=1e-12), 1, self.snap_max)
+            else:
+                self.snap_max = np.max(
+                    np.hstack((np.abs(snaps), (np.abs(self.Y[:, -1])).reshape((-1, 1)))), axis=1)[:, np.newaxis]
+                self.snap_max = np.where(np.isclose(
+                    self.snap_max, 0, atol=1e-12), 1, self.snap_max)
+                self.Y = (self.Y) / self.snap_max
+            if self.Y_input is not None:
+                self.snap_max_input = np.max(self.Y_input, axis=1)[
+                    :, np.newaxis]
+                self.snap_max_input = np.where(np.isclose(
+                    self.snap_max_input, 0, atol=1e-12), 1, self.snap_max_input)
+                self.Y_input = self.Y_input / self.max_min_input
+            if self.to_copy:
+                self.snapshots = self.snapshots / self.snap_max
         elif self.normalization == "norm":
             if self.Y is None:
                 temp = snaps

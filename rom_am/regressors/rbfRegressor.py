@@ -14,6 +14,8 @@ class RBFRegressor(RomRegressor):
         self.epsilon = epsilon
         self.degree = degree
         self.smoothing = smoothing
+        if self.smoothing == "auto":
+            self.smoothing = 1e-1
         self.norm = norm
         self.scale = None
 
@@ -41,3 +43,6 @@ class RBFRegressor(RomRegressor):
             return self.regr_model(new_input.T).T
         else:
             return self.regr_model(self.scale.transform(new_input.T)).T
+
+    def update(self, input_data, output_data, weights=None):
+        self.train(self, input_data, output_data, weights=weights)

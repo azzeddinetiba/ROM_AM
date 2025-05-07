@@ -5,6 +5,7 @@ from rom_am.dimreducers.rom_DimensionalityReducer import *
 from scipy.spatial import KDTree
 from scipy.spatial import Delaunay
 from sklearn.preprocessing import MinMaxScaler
+import pickle
 
 
 class PodReducer(RomDimensionalityReducer):
@@ -12,15 +13,17 @@ class PodReducer(RomDimensionalityReducer):
     def __init__(self, latent_dim, ) -> None:
         super().__init__(latent_dim)
 
-    def train(self, data, map_used=None, normalize=True, center=True, alg="svd", to_copy=True, to_copy_order='F'):
+    def train(self, data, map_used=None, normalize=True, center=True, alg="svd", to_copy=True, to_copy_order='F',
+              precomp_mean = None, precomp_std = None, normalization="norm"):
 
         super().train(data, map_used)
 
         pod = self._call_POD_core()
         rom = ROM(pod)
 
-        rom.decompose(X=data, normalize=normalize, center=center,
-                      rank=self.latent_dim, alg=alg, to_copy=to_copy, to_copy_order=to_copy_order)
+        rom.decompose(X=data, normalize=normalize, center=center, normalization=normalization,
+                      rank=self.latent_dim, alg=alg, to_copy=to_copy, to_copy_order=to_copy_order,
+                      precomp_mean = precomp_mean, precomp_std = precomp_std)
 
         self.latent_dim = pod.kept_rank
         self.normalize = normalize
@@ -36,6 +39,7 @@ class PodReducer(RomDimensionalityReducer):
             self.map_mat = map_used
             self.mapped_modes = self.pod.modes[self.map_mat, :]
 
+        """
         self.minmaxScaler = MinMaxScaler()
         self.minmaxScaler.fit(self.pod.pod_coeff[:3, :].T)
         self.tree = KDTree(self.minmaxScaler.transform(
@@ -45,12 +49,18 @@ class PodReducer(RomDimensionalityReducer):
         dists, _ = self.tree.query(self.minmaxScaler.transform(
             self.pod.pod_coeff[:3, :].T), k=self.pod.pod_coeff.shape[1])
         self.max_dist = dists.max()
+        """
 
-    def encode(self, new_data, high_dim=True):
+    def encode(self, new_data, high_dim=True, invertModes=False, invertModesAccumulated=False):
 
         if high_dim or self.map_mat is None:
             interm = self.rom.normalize(self.rom.center(new_data))
-            encoded_ = self.pod.project(interm)
+            if invertModes:
+                encoded_ = self.pod.project_inverted(interm)
+            elif invertModesAccumulated:
+                encoded_ = self.pod.project_inverted_accumulated(interm)
+            else:
+                encoded_ = self.pod.project(interm)
         else:
             interm = self.rom.normalize(self.rom.center(
                 new_data, self.map_mat), self.map_mat)
@@ -65,13 +75,18 @@ class PodReducer(RomDimensionalityReducer):
         #     return encoded_
         return encoded_
 
-    def decode(self, new_data, high_dim=False):
+    def decode(self, new_data, high_dim=False, invertModes=False, invertModesAccumulated=False):
 
         if self.map_mat is not None and not high_dim:
             interm = self._mapped_decode(new_data)
             return self.rom.decenter(self.rom.denormalize(interm, self.map_mat), self.map_mat)
         else:
-            interm = self.pod.inverse_project(new_data)
+            if invertModes:
+                interm = self.pod.inverse_project_inverted(new_data)
+            elif invertModesAccumulated:
+                interm = self.pod.inverse_project_inverted_accumulated(new_data)
+            else:
+                interm = self.pod.inverse_project(new_data)
             return self.rom.decenter(self.rom.denormalize(interm))
 
     def _call_POD_core(self, ):
@@ -87,3 +102,7 @@ class PodReducer(RomDimensionalityReducer):
     def truncate(self, new_dim):
         self.pod._truncate(new_dim)
         self.latent_dim = new_dim
+
+    def save(self, file_name):
+        with open(file_name+'.pkl', 'wb') as outp:
+            pickle.dump(self, outp, pickle.HIGHEST_PROTOCOL)

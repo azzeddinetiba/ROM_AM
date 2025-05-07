@@ -23,9 +23,39 @@ class PolynomialRegressor(RomRegressor):
         elif self.norm == "std":
             scale = StandardScaler()
 
+        if self.regul_alpha == "auto":
+            regul_alpha = self.compute_coefficient(input_data.shape[1])
+        else:
+            regul_alpha = self.regul_alpha
         self.regr_model = make_pipeline(scale,
-            PolynomialFeatures(self.poly_degree), Ridge(alpha=self.regul_alpha))
+            PolynomialFeatures(self.poly_degree), Ridge(alpha=regul_alpha))
         self.regr_model.fit(input_data.T, output_data.T, **{'ridge__sample_weight': weights})
 
     def predict(self, new_input):
         return self.regr_model.predict(new_input.T).T
+
+    def compute_coefficient(self, x):
+        """
+        Compute a coefficient that transitions smoothly from ~1e-1 (at x=0) to ~1e-8 (at x=250).
+
+        Args:
+            x (float or array-like): Number of points (0 to ~250).
+
+        Returns:
+            float or array: Corresponding coefficient.
+        """
+        # Sigmoid parameters
+        x0 = 125  # Midpoint of transition
+        k = 0.05  # Steepness of transition
+
+        # Compute sigmoid
+        sigmoid = 1 / (1 + np.exp(-k * (x - x0)))
+
+        # Compute coefficient in log-space
+        exponent = -1 - 7 * sigmoid
+        y = 10 ** exponent
+
+        return y
+
+    def update(self, input_data, output_data, weights):
+        self.train(input_data.T, output_data.T, weights)

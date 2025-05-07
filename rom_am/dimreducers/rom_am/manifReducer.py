@@ -42,10 +42,10 @@ class ManifInterpReducer(RomDimensionalityReducer):
         self.reducRef = bases_list[iref]
         stacked_U_log = np.empty(
             (self._p, self.high_dim, self.latent_dim))
-        stacked_romNorms = np.empty(
-            (self.high_dim, self._p))
-        stacked_romMeans = np.empty(
-            (self.high_dim, self._p))
+        # stacked_romNorms = np.empty(
+        #     (self.high_dim, self._p))
+        # stacked_romMeans = np.empty(
+        #     (self.high_dim, self._p))
 
         stacked_U_log[iref, :, :] = np.zeros((self.high_dim, self.latent_dim))
         # stacked_romNorms[:, iref] = bases_list[iref].rom.snap_norms
@@ -74,46 +74,50 @@ class ManifInterpReducer(RomDimensionalityReducer):
         # TODO normalize params ? same normalization as in regressors ?
         self.f_U = RBFInterpolator(
             params.T, stacked_U_log, kernel=kernel, epsilon=epsilon)
+        # self.f_U = make_pipeline(MaxAbsScaler(),
+        #     PolynomialFeatures(1), Ridge(alpha=1e-8))
+        # self.f_U.fit(params.T, stacked_U_log.reshape(self._p, -1))
 
-    def predictNewModes(self, new_mu, bases_list: list[PodReducer]):
-        U_pred = utils.exp_U(self.reducRef.pod.modes,
-                             self.f_U(new_mu.T)[0, :, :])
-        self.pod.modes = U_pred
-
-        self._orientationsAdjustment(bases_list, U_pred)
-        # self._findCalibrationMatrix(bases_list, U_pred)
-
-    # def _findCalibrationMatrix(self, bases_list: list[PodReducer], measureBase):
-
-    #     weightedSum = (np.array(
-    #         [a.pod.modes for a in bases_list]).T.dot(self.weights)).T
-    #     minimizationMatrix = measureBase.T @ weightedSum
-    #     prod = POD()
-    #     u, _, vh = prod.decompose(minimizationMatrix, thin=False)
-    #     self.calibrationQ = u @ vh
-
-    def _orientationsAdjustment(self, bases_list: list[PodReducer], measureBase):
+    def predictNewModes(self, new_mu:None, bases_list: list[PodReducer]=None, preComputed_basis=None):
+        if preComputed_basis is not None:
+            U_pred = preComputed_basis
+        else:
+            U_pred = utils.exp_U(self.reducRef.pod.modes,
+                                self.f_U(new_mu.T)[0, :, :]
+                                #  self.f_U.predict(new_mu.T).reshape(self.high_dim, self.latent_dim)
+                                )
+        self.pod.modes = U_pred.copy()
 
         idClosestBase, _, distsToPredictedBase = utils.minDistBase(
-            [a.pod.modes for a in bases_list], measureBase)
+            [a.pod.modes for a in bases_list], U_pred)
         self.weights = np.array(distsToPredictedBase)**(-self._m)
         self.weights /= np.sum(self.weights)
+
+        self._orientationsAdjustment(bases_list, idClosestBase)
+
+
+    def _orientationsAdjustment(self, bases_list: list[PodReducer], idClosestBase):
 
         for i in range(self._p):
             if i == idClosestBase:
                 continue
             for j in range(self.latent_dim):
-                condition = np.linalg.norm(bases_list[i].pod.modes[:, idClosestBase] - bases_list[i].pod.modes[:, j]) > np.linalg.norm(
-                    bases_list[i].pod.modes[:, idClosestBase] + bases_list[i].pod.modes[:, j])
+                condition = np.linalg.norm(bases_list[idClosestBase].pod.modes[:, j] - bases_list[i].pod.modes[:, j]) > np.linalg.norm(
+                    bases_list[idClosestBase].pod.modes[:, j] + bases_list[i].pod.modes[:, j])
                 if condition:
                     bases_list[i].pod.invertOrientation(j)
+            bases_list[i].pod.fillInvertedModesAccumulated()
 
 
-    def encode(self, new_data):
+    def encode(self, new_data, high_dim = False, invertModesAccumulated=False):
 
+        # TODO: invertedModes
         # if high_dim or self.map_mat is None:
         interm = self.rom.normalize(self.rom.center(new_data))
-        encoded_ = self.pod.project(interm)
+        if invertModesAccumulated:
+            encoded_ = self.pod.project_inverted_accumulated(interm)
+        else:
+            encoded_ = self.pod.project(interm)
         # else:
         #     interm = self.rom.normalize(self.rom.center(
         #         new_data, self.map_mat), self.map_mat)
@@ -121,9 +125,12 @@ class ManifInterpReducer(RomDimensionalityReducer):
 
         return encoded_
 
-    def decode(self, new_data, high_dim=False):
+    def decode(self, new_data, high_dim=False, invertModesAccumulated=False):
         try:
-            interm = self.pod.inverse_project(new_data)
+            if invertModesAccumulated:
+                interm = self.pod.inverse_project_inverted_accumulated(new_data)
+            else:
+                interm = self.pod.inverse_project(new_data)
             return self.rom.decenter(self.rom.denormalize(interm))
         except:
             raise Exception(

@@ -43,6 +43,43 @@ def dist(U, V):
 
     return np.sqrt(np.sum(np.arccos(sig[sig<1])**2))
 
+
+def minDistBase(bases_list, measureBase):
+
+    dists = []
+    for i in range(len(bases_list)):
+        dists.append(dist(bases_list[i], measureBase))
+    id_ = np.argmin(np.array(dists))
+    return id_, dists[id_], dists
+
+def rank1_update(basis:np.ndarray, new_vectors: np.ndarray, stepsize = None):
+    """Updating the basis matrix using GROUSE 1 rank update
+
+    Parameters
+    ----------
+    base        : numpy.ndarray
+                 Current basis matrix, of shape (n, r)
+    new_vectors : numpy.ndarray
+                 New observed vectors, of shape (n, m)
+    Returns
+    ----------
+
+    """
+
+    w = basis.T @ new_vectors
+    p = basis @ w
+    r = new_vectors - p
+    r_norm = np.linalg.norm(r)
+    p_norm = np.linalg.norm(p)
+    sigma = r_norm*p_norm
+
+    if stepsize is None:
+        stepsize_ = np.arcsin(r_norm/p_norm)/sigma
+    else:
+        stepsize_ = stepsize
+
+    basis += ( (np.cos(sigma*stepsize_)-1) * p/p_norm + np.sin(sigma*stepsize_) * r/r_norm ) @ w.T/np.linalg.norm(w)
+
 def cnvx_nnls(z, Z, ksi=1e5, mu=None):
     """Solving a non negative linear square problem
     min || Z w - z ||
