@@ -210,7 +210,7 @@ class FluidSurrog:
         self.trainIn.appendleft(input_.ravel())
         self.trainOut.appendleft(outLoadCoeff.ravel())
 
-        if changeTheBasis is not None:
+        if changeTheBasis is not None and solidReduc is not None:
 
             tmpIn = np.column_stack(self.trainIn)
             tmpIn[:solidReduc.latent_dim, :] = changeTheBasis @ tmpIn[:solidReduc.latent_dim, :]
