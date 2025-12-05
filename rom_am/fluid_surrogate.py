@@ -51,7 +51,7 @@ class FluidSurrog:
               rank_pres=.9999, rank_disp=.9999, degree=2, solidReduc: RomDimensionalityReducer = None, epsilon=1.,
               norm=[True, True], center=[True, True], norm_regr="max", params=None, weights=None, param_encoder=False,
               param_decoder=False, param_regressor=False, multiple_param_regressor=False, normalization=["norm", "norm"],
-              precomputedReducLoad=None):
+              precomputedReducLoad=None, alg="svd"):
 
         self.single_regressor = True
         warning_text = "The data matrix should be of shape (p, N, m) with p the number of parameters"
@@ -87,7 +87,7 @@ class FluidSurrog:
                 for i in range(len(fluidData)):
                     reducLoadLocal_ = PodReducer(latent_dim=rank_pres)
                     reducLoadLocal_.train(fluidData[i], normalize=norm[0], normalization=normalization[0],
-                                        center=center[0], to_copy=False, alg="svd",)
+                                        center=center[0], to_copy=False, alg=alg,)
                     reducLoadLocals.append(reducLoadLocal_)
                 self.reducLoad = ManifInterpReducer(reducLoadLocal_.latent_dim)
                 self.reducLoad.train(reducLoadLocals, params)

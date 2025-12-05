@@ -36,12 +36,14 @@ def exp_U(U, delt):
 
     return np.linalg.multi_dot((U, vh.T, np.diag(np.cos(sig)), vh)) + np.linalg.multi_dot((q, np.diag(np.sin(sig)), vh))
 
-def dist(U, V):
-
+def angles(U, V):
     prod = POD()
     _, sig, _ = prod.decompose(U.T @ V, thin=True)
 
-    return np.sqrt(np.sum(np.arccos(sig[sig<1])**2))
+    return np.arccos(sig[sig<1])
+
+def dist(U, V):
+    return np.sqrt(np.sum(angles(U, V)**2))
 
 
 def minDistBase(bases_list, measureBase):

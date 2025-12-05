@@ -65,7 +65,7 @@ class TrackedFluidSurrog:
               rank_pres=.9999, rank_disp=.9999, degree=2, solidReduc: RomDimensionalityReducer = None, epsilon=1.,
               norm=[True, True], center=[True, True], norm_regr="max", params=None, weights=None, param_encoder=False,
               param_decoder=False, param_regressor=False, multiple_param_regressor=False, hidden_layers=np.array([
-            40, 40, 40]), normalization=["norm", "norm"], initAlpha=6e-3, cleanup=True):
+            40, 40, 40]), normalization=["norm", "norm"], initAlpha=6e-3, cleanup=True, alg="svd"):
 
         self.single_regressor = True
         warning_text = "The data matrix should be of shape (p, N, m) with p the number of parameters"
@@ -130,7 +130,7 @@ class TrackedFluidSurrog:
         for i in range(len(fluidData)):
             reducLoadLocal_ = PodReducer(latent_dim=rank_pres)
             reducLoadLocal_.train(fluidData[i], precomp_mean=mean_, normalization=normalization[0], normalize=norm[0],
-                                  precomp_std=std_, to_copy=False, alg="svd",)
+                                  precomp_std=std_, to_copy=False, alg=alg,)
             reducLoadLocals.append(reducLoadLocal_)
             self.reducedPrevLoadData.append(
                 reducLoadLocal_.encode(fluidPrevData[i]))
@@ -221,7 +221,10 @@ class TrackedFluidSurrog:
                     subspace_angles(tmpBasis, self.cloneBasis))
 
             if self.countUpdate > self.updateThres:
-                self._updateLoadBasis(solidReduc)
+                if solidReduc is not None:
+                    self._updateLoadBasis(solidReduc)
+                else:
+                    self._updateLoadBasis(self.reducDisp)
                 self.countUpdate = 0
                 self.countAugment = 0
 
