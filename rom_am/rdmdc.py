@@ -12,14 +12,17 @@ class RDMDC:
 
     def decompose(self,
                   X,
-                  alg="svd",
-                  rank=None,
-                  opt_trunc=False,
-                  tikhonov=0,
-                  Y=None,
-                  u_input=None,
-                  initialization=0,
-                  normLoadReducer=False):
+                  Y,
+                  alg               = "svd",
+                  rank              = None,
+                  opt_trunc         = False,
+                  tikhonov          = 0,
+                  u_input           = None,
+                  initialization    = 0,
+                  normLoadReducer   = False,
+                  precomp_mean      = None,
+                  precomp_std       = None,
+                  precomputed_modes = None):
 
         self.tikhonov = tikhonov
         if self.tikhonov:
@@ -32,9 +35,16 @@ class RDMDC:
         # POD Decomposition of the X and Y matrix
         self.pod = RPOD(self.lamnbdaForgetBasis)
         self.rom = ROM(self.pod)
-        self.rom.decompose(
-            Y, alg=alg, rank=rank, opt_trunc=opt_trunc,
-            normalize=normLoadReducer, center=True)
+        if precomp_mean is not None:
+            self.rom.decompose(
+                Y, alg=alg, rank=rank, opt_trunc=opt_trunc,
+                precomp_mean=precomp_mean, precomp_std=precomp_std)
+        else:
+            self.rom.decompose(
+                Y, alg=alg, rank=rank, opt_trunc=opt_trunc,
+                normalize=normLoadReducer, center=True)
+        if precomputed_modes is not None:
+            self.pod.modes = precomputed_modes
         self._kept_rank = self.pod.kept_rank
 
         Xr = self.pod.project(self.rom.normalize(self.rom.center(X)))
