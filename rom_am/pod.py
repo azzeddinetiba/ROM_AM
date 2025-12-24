@@ -231,7 +231,7 @@ class POD:
     def pod_coeff(self):
 
         if self._pod_coeff is None:
-            self._pod_coeff = np.diag(self.singvals) @ self.time
+            self._pod_coeff = (self.time.T * self.singvals).T
         return self._pod_coeff
 
     @property
