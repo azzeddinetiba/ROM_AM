@@ -86,11 +86,11 @@ class ManifInterpReducer(RomDimensionalityReducer):
                                 self.f_U(new_mu.T)[0, :, :]
                                 #  self.f_U.predict(new_mu.T).reshape(self.high_dim, self.latent_dim)
                                 )
-        self.pod.modes = U_pred.copy()
+        self.pod.modes = U_pred
 
         idClosestBase, _, distsToPredictedBase = utils.minDistBase(
             [a.pod.modes for a in bases_list], U_pred)
-        self.weights = np.array(distsToPredictedBase)**(-self._m)
+        self.weights = distsToPredictedBase**(-self._m)
         self.weights /= np.sum(self.weights)
 
         self._orientationsAdjustment(bases_list, idClosestBase)
@@ -102,8 +102,7 @@ class ManifInterpReducer(RomDimensionalityReducer):
             if i == idClosestBase:
                 continue
             for j in range(self.latent_dim):
-                condition = np.linalg.norm(bases_list[idClosestBase].pod.modes[:, j] - bases_list[i].pod.modes[:, j]) > np.linalg.norm(
-                    bases_list[idClosestBase].pod.modes[:, j] + bases_list[i].pod.modes[:, j])
+                condition = np.dot(bases_list[idClosestBase].pod.modes[:, j], bases_list[i].pod.modes[:, j]) < 0
                 if condition:
                     bases_list[i].pod.invertOrientation(j)
             bases_list[i].pod.fillInvertedModesAccumulated()

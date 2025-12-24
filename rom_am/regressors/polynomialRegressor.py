@@ -28,7 +28,7 @@ class PolynomialRegressor(RomRegressor):
         else:
             regul_alpha = self.regul_alpha
         self.regr_model = make_pipeline(scale,
-            PolynomialFeatures(self.poly_degree), Ridge(alpha=regul_alpha))
+            PolynomialFeatures(self.poly_degree), Ridge(alpha=regul_alpha, copy_X=False))
         self.regr_model.fit(input_data.T, output_data.T, **{'ridge__sample_weight': weights})
 
     def predict(self, new_input):

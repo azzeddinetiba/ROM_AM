@@ -2,6 +2,7 @@ from scipy.linalg import logm, expm
 import numpy as np
 from rom_am.pod import POD
 from scipy.optimize import nnls
+from joblib import Parallel, delayed
 
 def log_A(A, At, exp = False):
     if exp:
@@ -48,10 +49,10 @@ def dist(U, V):
 
 def minDistBase(bases_list, measureBase):
 
-    dists = []
-    for i in range(len(bases_list)):
-        dists.append(dist(bases_list[i], measureBase))
-    id_ = np.argmin(np.array(dists))
+    dists = np.array(Parallel(n_jobs=-1, backend='loky')(
+        delayed(dist)(base, measureBase) for base in bases_list
+    ))
+    id_ = np.argmin(dists)
     return id_, dists[id_], dists
 
 def rank1_update(basis:np.ndarray, new_vectors: np.ndarray, stepsize = None):
@@ -73,14 +74,16 @@ def rank1_update(basis:np.ndarray, new_vectors: np.ndarray, stepsize = None):
     r = new_vectors - p
     r_norm = np.linalg.norm(r)
     p_norm = np.linalg.norm(p)
-    sigma = r_norm*p_norm
 
     if stepsize is None:
-        stepsize_ = np.arcsin(r_norm/p_norm)/sigma
+        stepsize_ = np.arcsin(r_norm/p_norm)
     else:
-        stepsize_ = stepsize
+        stepsize_ = stepsize * (r_norm * p_norm)
 
-    basis += ( (np.cos(sigma*stepsize_)-1) * p/p_norm + np.sin(sigma*stepsize_) * r/r_norm ) @ w.T/np.linalg.norm(w)
+    w_norm = np.linalg.norm(w)
+    coeff1 = (np.cos(stepsize_) - 1) / p_norm
+    coeff2 = np.sin(stepsize_) / r_norm
+    basis += (coeff1 * p + coeff2 * r) @ (w.T / w_norm)
 
 def cnvx_nnls(z, Z, ksi=1e5, mu=None):
     """Solving a non negative linear square problem

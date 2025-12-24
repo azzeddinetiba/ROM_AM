@@ -17,6 +17,7 @@ from rom_am.utils import rank1_update
 from rom_am.rpod import _compute_past
 from scipy.linalg import subspace_angles
 import time
+from joblib import Parallel, delayed
 
 
 class TrackedFluidSurrog:
@@ -269,6 +270,8 @@ class TrackedFluidSurrog:
         # for i in range(len(self.trainIn)):
         #     self.trainIn[i] = np.vstack((self.trainIn[i]
         #                                 [:solidReduc.latent_dim, [0]], self.calibrationQs[-1] @  self.trainIn[i][solidReduc.latent_dim:, [0]]))
+        # Below, we suppose that the predicted basis (Grassmann-interpolated) is the closest to the current basis (rank1 updated),
+        # so no moves were inverted in the former. Hence, we only need to apply the calibration, and no additional treatment is needed.
         tmpIn = np.column_stack(self.trainIn)
         tmpIn[solidReduc.latent_dim:,
               :] = self.calibrationQs[-1] @ tmpIn[solidReduc.latent_dim:, :]
@@ -279,13 +282,16 @@ class TrackedFluidSurrog:
         self.sendSignalBasis = self.calibrationQs[-1].copy()
 
     def _compute_calibrations(self):
-        self.calibrationQs = []
-        for i in range(self._p):
+        def _core_calibration_computation(currentReducLoadBasis, localReducLoad):
             prod = POD()
             u, _, vh = prod.decompose(
-                self.reducLoad.pod.modes.T @ self.reducLoadLocals[i].pod.modes, thin=False)
-            self.calibrationQs.append(u @ vh)
-            # self.calibrationQs.append(self.reducLoad.pod.modes.T @ self.reducLoadLocals[i].pod.modes)
+                currentReducLoadBasis.T @ localReducLoad.pod.modes, thin=False)
+            return u @ vh
+
+        self.calibrationQs = Parallel(n_jobs=-1)(
+            delayed(_core_calibration_computation)(self.reducLoad.pod.modes, local)
+            for local in self.reducLoadLocals
+        )
         self.stacked_calib = np.stack(self.calibrationQs)
 
     def train_regressions(self, kernel, smoothing, degree, epsilon, weights, norm_regr, hidden_layers=np.array([
