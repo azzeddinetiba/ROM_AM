@@ -13,7 +13,7 @@ import copy
 from scipy.spatial import KDTree
 from sklearn.preprocessing import MinMaxScaler
 from rom_am.pod import POD
-from rom_am.utils import rank1_update
+from rom_am.utils import rank1_update, _determine_pod_alg_square_matrices
 from rom_am.rpod import _compute_past
 from scipy.linalg import subspace_angles
 import time
@@ -23,7 +23,7 @@ from joblib import Parallel, delayed
 class TrackedFluidSurrog:
 
     def __init__(self, maxLen=6900, reTrainThres=240, parametric=False, updateBasis=False, updateThres=300,
-                 updateOmega=False):
+                 updateOmega=False, njobs_online=1, alg_square_matrices=None):
         self.trainIn = collections.deque(maxlen=maxLen)
         self.trainOut = collections.deque(maxlen=maxLen)
         self.maxLen = maxLen
@@ -54,6 +54,8 @@ class TrackedFluidSurrog:
         self.updateOmega = updateOmega
         self.retrainingTime = []
         self.stacked_calib = None
+        self.njobs_online = 1
+        self.alg_square_matrices = alg_square_matrices
 
     def sigmoid(self, x, n=1):
         s = int(n/2)
@@ -182,7 +184,7 @@ class TrackedFluidSurrog:
         self.sendSignalBasis = None
 
         if not self._predictedBasis:
-            self.initialize_predictions(params)
+            self.initialize_predictions(params, njobs=self.njobs_online, alg=self.alg_square_matrices)
 
         assert (
             solidReduc is not None or self.reducDisp is not None), "A displacement Encoder is not available"
@@ -260,12 +262,12 @@ class TrackedFluidSurrog:
         self._omega_terms = (1-self.omega0, self.omega0)
 
         self.reducLoad.predictNewModes(
-            None, self.reducLoadLocals, self.cloneBasis.copy())
+            None, self.reducLoadLocals, self.cloneBasis.copy(), njobs=self.njobs_online)
 
         self.regressor.append(copy.deepcopy(self.new_regressor))
         self.new_regressor = None
 
-        self._compute_calibrations()
+        self._compute_calibrations(njobs=self.njobs_online, alg=self.alg_square_matrices)
 
         # for i in range(len(self.trainIn)):
         #     self.trainIn[i] = np.vstack((self.trainIn[i]
@@ -281,14 +283,15 @@ class TrackedFluidSurrog:
 
         self.sendSignalBasis = self.calibrationQs[-1].copy()
 
-    def _compute_calibrations(self):
+    def _compute_calibrations(self, njobs=1, alg=None):
+        alg = _determine_pod_alg_square_matrices(alg=alg, size_=self.reducLoad.pod.modes.shape[1])
         def _core_calibration_computation(currentReducLoadBasis, localReducLoad):
             prod = POD()
             u, _, vh = prod.decompose(
-                currentReducLoadBasis.T @ localReducLoad.pod.modes, thin=False)
+                currentReducLoadBasis.T @ localReducLoad.pod.modes, thin=False, alg=alg)
             return u @ vh
 
-        self.calibrationQs = Parallel(n_jobs=-1)(
+        self.calibrationQs = Parallel(n_jobs=njobs, backend='loky', prefer='threads')(
             delayed(_core_calibration_computation)(self.reducLoad.pod.modes, local)
             for local in self.reducLoadLocals
         )
@@ -340,15 +343,15 @@ class TrackedFluidSurrog:
             self.reducedLoadData[i][self.reducLoadLocals[i].pod.invertedModes, :] *= -1
             self.reducedPrevLoadData[i][self.reducLoadLocals[i].pod.invertedModes, :] *= -1
 
-    def initialize_predictions(self, params=None):
+    def initialize_predictions(self, params=None, njobs=1, alg=None):
 
         if not self._predictedBasis:
-            self.reducLoad.predictNewModes(params, self.reducLoadLocals)
+            self.reducLoad.predictNewModes(params, self.reducLoadLocals, njobs=njobs)
             if self.updateBasis:
                 self.cloneBasis = self.reducLoad.pod.modes.copy()
                 # self.L = (self.cloneBasis.T @ prevLoad) @ (self.cloneBasis.T @ prevLoad).T
 
-            self._compute_calibrations()
+            self._compute_calibrations(njobs = njobs, alg=alg)
 
             self._predictedBasis = True
 
@@ -356,7 +359,7 @@ class TrackedFluidSurrog:
         assert (
             solidReduc is not None or self.reducDisp is not None), "A displacement Encoder is not available"
 
-        self.initialize_predictions(params)
+        self.initialize_predictions(params, njobs=self.njobs_online, alg=self.alg_square_matrices)
 
         if takes_low_dimensional_disp:
             coeffDisp = newDisp

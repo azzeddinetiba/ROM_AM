@@ -37,20 +37,21 @@ def exp_U(U, delt):
 
     return np.linalg.multi_dot((U, vh.T, np.diag(np.cos(sig)), vh)) + np.linalg.multi_dot((q, np.diag(np.sin(sig)), vh))
 
-def angles(U, V):
+def angles(U, V, alg=None):
+    alg = _determine_pod_alg_square_matrices(alg, U.shape[1])
     prod = POD()
-    _, sig, _ = prod.decompose(U.T @ V, thin=True)
+    _, sig, _ = prod.decompose(U.T @ V, thin=True, alg=alg)
 
     return np.arccos(sig[sig<1])
 
-def dist(U, V):
-    return np.sqrt(np.sum(angles(U, V)**2))
+def dist(U, V, alg=None):
+    return np.sqrt(np.sum(angles(U, V, alg=alg)**2))
 
 
-def minDistBase(bases_list, measureBase):
+def minDistBase(bases_list, measureBase, njobs=1, alg=None):
 
-    dists = np.array(Parallel(n_jobs=-1, backend='loky')(
-        delayed(dist)(base, measureBase) for base in bases_list
+    dists = np.array(Parallel(n_jobs=njobs, backend='loky', prefer='threads')(
+        delayed(dist)(base, measureBase, alg) for base in bases_list
     ))
     id_ = np.argmin(dists)
     return id_, dists[id_], dists
@@ -127,3 +128,13 @@ def cnvx_nnls(z, Z, ksi=1e5, mu=None):
     w, _ = nnls(Zaug, zaug.ravel())
 
     return w
+
+def _determine_pod_alg_square_matrices(alg, size_):
+    if alg is None:
+        if size_ < 400:
+            alg = "snap"
+        else:
+            alg = "svd"
+    else:
+        assert (alg == "svd" or alg == "snap"), "The algorithm chosen must be `snap` or `svd`"
+    return alg

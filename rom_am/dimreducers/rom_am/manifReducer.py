@@ -78,7 +78,7 @@ class ManifInterpReducer(RomDimensionalityReducer):
         #     PolynomialFeatures(1), Ridge(alpha=1e-8))
         # self.f_U.fit(params.T, stacked_U_log.reshape(self._p, -1))
 
-    def predictNewModes(self, new_mu:None, bases_list: list[PodReducer]=None, preComputed_basis=None):
+    def predictNewModes(self, new_mu:None, bases_list: list[PodReducer]=None, preComputed_basis=None, njobs=1, alg=None):
         if preComputed_basis is not None:
             U_pred = preComputed_basis
         else:
@@ -89,7 +89,7 @@ class ManifInterpReducer(RomDimensionalityReducer):
         self.pod.modes = U_pred
 
         idClosestBase, _, distsToPredictedBase = utils.minDistBase(
-            [a.pod.modes for a in bases_list], U_pred)
+            [a.pod.modes for a in bases_list], U_pred, njobs=njobs, alg=alg)
         self.weights = distsToPredictedBase**(-self._m)
         self.weights /= np.sum(self.weights)
 

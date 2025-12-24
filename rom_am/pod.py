@@ -145,6 +145,8 @@ class POD:
             vh = v.T
 
             u = X @ v[:, :rank] * s_inv
+        else:
+            raise AssertionError
 
         self.kept_rank = rank
 
