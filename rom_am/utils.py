@@ -37,24 +37,30 @@ def exp_U(U, delt):
 
     return np.linalg.multi_dot((U, vh.T, np.diag(np.cos(sig)), vh)) + np.linalg.multi_dot((q, np.diag(np.sin(sig)), vh))
 
-def angles(U, V, alg=None):
+def angles(U, V, alg=None, compute_calibration=False):
     alg = _determine_pod_alg_square_matrices(alg, U.shape[1])
     prod = POD()
-    _, sig, _ = prod.decompose(U.T @ V, thin=True, alg=alg)
+    u, sig, vh = prod.decompose(U.T @ V, thin=True, alg=alg)
+    calib = None
+    if compute_calibration:
+        calib = vh.T @ u.T
 
-    return np.arccos(sig[sig<1])
+    return np.arccos(sig[sig<1]), calib
 
-def dist(U, V, alg=None):
-    return np.sqrt(np.sum(angles(U, V, alg=alg)**2))
+def dist(U, V, alg=None, compute_calibration=False):
+    angles_, calib = angles(U, V, alg, compute_calibration)
+    return np.sqrt(np.sum(angles_**2)), calib
 
 
-def minDistBase(bases_list, measureBase, njobs=1, alg=None):
+def minDistBase(bases_list, measureBase, njobs=1, alg=None, compute_calibration=False):
 
-    dists = np.array(Parallel(n_jobs=njobs, backend='loky', prefer='threads')(
-        delayed(dist)(base, measureBase, alg) for base in bases_list
-    ))
+    dists_and_calibs = Parallel(n_jobs=njobs, backend='loky', prefer='threads')(
+        delayed(dist)(base, measureBase, alg, compute_calibration) for base in bases_list
+    )
+    dists, calibs = zip(*dists_and_calibs)
+    dists = np.array(list(dists))
     id_ = np.argmin(dists)
-    return id_, dists[id_], dists
+    return id_, dists[id_], dists, list(calibs)
 
 def rank1_update(basis:np.ndarray, new_vectors: np.ndarray, stepsize = None):
     """Updating the basis matrix using GROUSE 1 rank update

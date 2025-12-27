@@ -261,13 +261,13 @@ class TrackedFluidSurrog:
         self.omega0 = 0.5
         self._omega_terms = (1-self.omega0, self.omega0)
 
-        self.reducLoad.predictNewModes(
-            None, self.reducLoadLocals, self.cloneBasis.copy(), njobs=self.njobs_online)
+        calibs = self.reducLoad.predictNewModes(
+            None, self.reducLoadLocals, self.cloneBasis.copy(), njobs=self.njobs_online, compute_calibration=True)
 
         self.regressor.append(copy.deepcopy(self.new_regressor))
         self.new_regressor = None
 
-        self._compute_calibrations(njobs=self.njobs_online, alg=self.alg_square_matrices)
+        self._compute_calibrations(njobs=self.njobs_online, alg=self.alg_square_matrices, already_computed_calibs=calibs)
 
         # for i in range(len(self.trainIn)):
         #     self.trainIn[i] = np.vstack((self.trainIn[i]
@@ -281,20 +281,28 @@ class TrackedFluidSurrog:
         self.trainOut = collections.deque(
             (self.calibrationQs[-1] @ np.column_stack(self.trainOut)).T)
 
-        self.sendSignalBasis = self.calibrationQs[-1].copy()
+        self.sendSignalBasis = self.calibrationQs[-1]
 
-    def _compute_calibrations(self, njobs=1, alg=None):
-        alg = _determine_pod_alg_square_matrices(alg=alg, size_=self.reducLoad.pod.modes.shape[1])
-        def _core_calibration_computation(currentReducLoadBasis, localReducLoad):
-            prod = POD()
-            u, _, vh = prod.decompose(
-                currentReducLoadBasis.T @ localReducLoad.pod.modes, thin=False, alg=alg)
-            return u @ vh
+    def _compute_calibrations(self, njobs=1, alg=None, already_computed_calibs=None):
+        compute_calibs = True
+        if already_computed_calibs is not None:
+            compute_calibs = False
+            if already_computed_calibs[0] is None:
+                compute_calibs = True
+        if compute_calibs:
+            alg = _determine_pod_alg_square_matrices(alg=alg, size_=self.reducLoad.pod.modes.shape[1])
+            def _core_calibration_computation(currentReducLoadBasis, localReducLoad):
+                prod = POD()
+                u, _, vh = prod.decompose(
+                    currentReducLoadBasis.T @ localReducLoad.pod.modes, thin=False, alg=alg)
+                return u @ vh
 
-        self.calibrationQs = Parallel(n_jobs=njobs, backend='loky', prefer='threads')(
-            delayed(_core_calibration_computation)(self.reducLoad.pod.modes, local)
-            for local in self.reducLoadLocals
-        )
+            self.calibrationQs = Parallel(n_jobs=njobs, backend='loky', prefer='threads')(
+                delayed(_core_calibration_computation)(self.reducLoad.pod.modes, local)
+                for local in self.reducLoadLocals
+            )
+        else:
+            self.calibrationQs=already_computed_calibs
         self.stacked_calib = np.stack(self.calibrationQs)
 
     def train_regressions(self, kernel, smoothing, degree, epsilon, weights, norm_regr, hidden_layers=np.array([
@@ -346,12 +354,12 @@ class TrackedFluidSurrog:
     def initialize_predictions(self, params=None, njobs=1, alg=None):
 
         if not self._predictedBasis:
-            self.reducLoad.predictNewModes(params, self.reducLoadLocals, njobs=njobs)
+            calibs = self.reducLoad.predictNewModes(params, self.reducLoadLocals, njobs=njobs, compute_calibration=True)
             if self.updateBasis:
                 self.cloneBasis = self.reducLoad.pod.modes.copy()
                 # self.L = (self.cloneBasis.T @ prevLoad) @ (self.cloneBasis.T @ prevLoad).T
 
-            self._compute_calibrations(njobs = njobs, alg=alg)
+            self._compute_calibrations(njobs = njobs, alg=alg, already_computed_calibs=calibs)
 
             self._predictedBasis = True
 

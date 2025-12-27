@@ -78,7 +78,7 @@ class ManifInterpReducer(RomDimensionalityReducer):
         #     PolynomialFeatures(1), Ridge(alpha=1e-8))
         # self.f_U.fit(params.T, stacked_U_log.reshape(self._p, -1))
 
-    def predictNewModes(self, new_mu:None, bases_list: list[PodReducer]=None, preComputed_basis=None, njobs=1, alg=None):
+    def predictNewModes(self, new_mu:None, bases_list: list[PodReducer]=None, preComputed_basis=None, njobs=1, alg=None, compute_calibration=False):
         if preComputed_basis is not None:
             U_pred = preComputed_basis
         else:
@@ -88,16 +88,22 @@ class ManifInterpReducer(RomDimensionalityReducer):
                                 )
         self.pod.modes = U_pred
 
-        idClosestBase, _, distsToPredictedBase = utils.minDistBase(
-            [a.pod.modes for a in bases_list], U_pred, njobs=njobs, alg=alg)
+        idClosestBase, _, distsToPredictedBase, calibs = utils.minDistBase(
+            [a.pod.modes for a in bases_list], U_pred, njobs=njobs, alg=alg, compute_calibration=compute_calibration)
         self.weights = distsToPredictedBase**(-self._m)
         self.weights /= np.sum(self.weights)
 
-        self._orientationsAdjustment(bases_list, idClosestBase)
+        self._orientationsAdjustment(bases_list, idClosestBase, already_computed_calibs=calibs)
+
+        return calibs
 
 
-    def _orientationsAdjustment(self, bases_list: list[PodReducer], idClosestBase):
-
+    def _orientationsAdjustment(self, bases_list: list[PodReducer], idClosestBase, already_computed_calibs=None):
+        invert_calibs = False
+        if already_computed_calibs is not None:
+            invert_calibs = True
+            if already_computed_calibs[0] is None:
+                invert_calibs = False
         for i in range(self._p):
             if i == idClosestBase:
                 continue
@@ -105,6 +111,8 @@ class ManifInterpReducer(RomDimensionalityReducer):
                 condition = np.dot(bases_list[idClosestBase].pod.modes[:, j], bases_list[i].pod.modes[:, j]) < 0
                 if condition:
                     bases_list[i].pod.invertOrientation(j)
+                    if invert_calibs:
+                        already_computed_calibs[i][:, j] *= -1
             bases_list[i].pod.fillInvertedModesAccumulated()
 
 
