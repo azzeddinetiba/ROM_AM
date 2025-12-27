@@ -277,9 +277,9 @@ class TrackedFluidSurrog:
         tmpIn = np.column_stack(self.trainIn)
         tmpIn[solidReduc.latent_dim:,
               :] = self.calibrationQs[-1] @ tmpIn[solidReduc.latent_dim:, :]
-        self.trainIn = collections.deque(tmpIn.T)
+        self.trainIn = collections.deque(tmpIn.T, maxlen=self.maxLen)
         self.trainOut = collections.deque(
-            (self.calibrationQs[-1] @ np.column_stack(self.trainOut)).T)
+            (self.calibrationQs[-1] @ np.column_stack(self.trainOut)).T, maxlen=self.maxLen)
 
         self.sendSignalBasis = self.calibrationQs[-1]
 
