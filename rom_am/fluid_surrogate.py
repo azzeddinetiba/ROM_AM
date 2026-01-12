@@ -1,5 +1,6 @@
 import numpy as np
 import collections
+from rom_am.regressors.polynomialLassoRegressor import PolynomialLassoRegressor
 from rom_am.regressors.polynomialRegressor import PolynomialRegressor
 from rom_am.dimreducers.rom_DimensionalityReducer import RomDimensionalityReducer
 from rom_am.dimreducers.rom_am.podReducer import PodReducer
@@ -188,6 +189,8 @@ class FluidSurrog:
             if kernel == "poly":
                 self.regressor = PolynomialDynamicalRegressor(
                     smoothing, degree, self.reducLoad.latent_dim)
+            elif kernel == "lasso":
+                self.regressor = PolynomialLassoRegressor(poly_degree=degree, criterion='bic', norm_regr=norm_regr)
             elif kernel == "polyC":
                 self.regressor = PolynomialRegressor(smoothing, degree, True, norm = norm_regr)
             else:
