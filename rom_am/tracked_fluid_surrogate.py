@@ -13,9 +13,8 @@ import copy
 from scipy.spatial import KDTree
 from sklearn.preprocessing import MinMaxScaler
 from rom_am.pod import POD
-from rom_am.utils import rank1_update, _determine_pod_alg_square_matrices
+from rom_am.utils import rank1_update, _determine_pod_alg_square_matrices, angles
 from rom_am.rpod import _compute_past
-from scipy.linalg import subspace_angles
 import time
 from joblib import Parallel, delayed
 
@@ -23,7 +22,8 @@ from joblib import Parallel, delayed
 class TrackedFluidSurrog:
 
     def __init__(self, maxLen=6900, reTrainThres=240, parametric=False, updateBasis=False, updateThres=300,
-                 updateOmega=False, njobs_online=1, alg_square_matrices=None):
+                 updateOmega=False, njobs_online=1, alg_square_matrices=None, m=2, update_omega_with_basis=False,
+                 automatic_weight=False, automatic_weight_at_retrain = False, eps_for_automatic_weight=2.):
         self.trainIn = collections.deque(maxlen=maxLen)
         self.trainOut = collections.deque(maxlen=maxLen)
         self.maxLen = maxLen
@@ -52,14 +52,22 @@ class TrackedFluidSurrog:
         self.sendSignalBasis = None
         self.recursive_angles = []
         self.updateOmega = updateOmega
+        self.update_omega_with_basis = update_omega_with_basis
         self.retrainingTime = []
+        self.updatingBasisTime = []
         self.stacked_calib = None
         self.njobs_online = 1
         self.alg_square_matrices = alg_square_matrices
+        self._m = m
+        self.automatic_weight = automatic_weight
+        self.automatic_weight_at_retrain = automatic_weight_at_retrain
+        self.number_of_initial_snaps = 1
+        self._p0 = None
+        self.eps_for_automatic_weight = eps_for_automatic_weight
 
-    def sigmoid(self, x, n=1):
+    def sigmoid(self, x, n=1, eps=0.1):
         s = int(n/2)
-        a = 0.1*n
+        a = eps*n
         e = np.exp(-(x-s)/a)
         m = (1. + e)
         return 1/m
@@ -74,6 +82,7 @@ class TrackedFluidSurrog:
         warning_text = "The data matrix should be of shape (p, N, m) with p the number of parameters"
         if multiple_param_regressor:
             self._p = params.shape[1]
+            self._p0 = params.shape[1]
             self.multiple_regressor = True
             assert (multiple_param_regressor !=
                     param_regressor), "Either a single regressor or multiple regressors"
@@ -95,6 +104,7 @@ class TrackedFluidSurrog:
                     fluidPrevData, list)), warning_text
                 assert (len(fluidData) == self._p and len(
                     fluidPrevData) == self._p), warning_text
+        self.number_of_initial_snaps = min(a.shape[1] for a in dispData)
 
         # print(" ----- Displacement Reduction -----")
         if solidReduc is not None:
@@ -140,7 +150,7 @@ class TrackedFluidSurrog:
             self.reducedLoadData.append(reducLoadLocal_.encode(fluidData[i]))
             self.reducedDispData.append(reducDisp.encode(dispData[i]))
 
-        self.reducLoad = ManifInterpReducer(reducLoadLocal_.latent_dim)
+        self.reducLoad = ManifInterpReducer(reducLoadLocal_.latent_dim, m=self._m)
         self.reducLoad.train(reducLoadLocals, params, precomp_mean=mean_,
                              precomp_std=std_)
         self.reducLoadLocals = reducLoadLocals
@@ -221,7 +231,7 @@ class TrackedFluidSurrog:
             # indicator = np.linalg.norm(self.cloneBasis.T @ self.cloneBasis - np.eye(self.reducLoad.latent_dim))
             if computeAngle:
                 self.recursive_angles.append(
-                    subspace_angles(tmpBasis, self.cloneBasis))
+                    angles(tmpBasis, self.cloneBasis)[0])
 
             if self.countUpdate > self.updateThres:
                 if solidReduc is not None:
@@ -249,6 +259,9 @@ class TrackedFluidSurrog:
             self.omega0 += 0.3*(1-self.omega0)
             self._omega_terms = (1-self.omega0, self.omega0)
 
+        if self.automatic_weight:
+            self._determine_automatic_omega()
+
         t1 = time.time()
         self.retrainingTime.append(t1 - t0)
         with open("./coSimData/tracked_retraining_time.npy", 'wb') as f:
@@ -256,9 +269,12 @@ class TrackedFluidSurrog:
 
     def _updateLoadBasis(self, solidReduc: PodReducer):
         print("=== - Updating the load basis - ===")
+        t0 = time.time()
+
         self.reducLoadLocals.append(copy.deepcopy(self.reducLoad))
         self._p += 1
-        self.omega0 = 0.5
+        if not self.automatic_weight:
+            self.omega0 = 0.5
         self._omega_terms = (1-self.omega0, self.omega0)
 
         calibs = self.reducLoad.predictNewModes(
@@ -272,16 +288,38 @@ class TrackedFluidSurrog:
         # for i in range(len(self.trainIn)):
         #     self.trainIn[i] = np.vstack((self.trainIn[i]
         #                                 [:solidReduc.latent_dim, [0]], self.calibrationQs[-1] @  self.trainIn[i][solidReduc.latent_dim:, [0]]))
-        # Below, we suppose that the predicted basis (Grassmann-interpolated) is the closest to the current basis (rank1 updated),
-        # so no moves were inverted in the former. Hence, we only need to apply the calibration, and no additional treatment is needed.
         tmpIn = np.column_stack(self.trainIn)
+        tmpIn[solidReduc.latent_dim:,
+              :][self.reducLoadLocals[-1].pod.invertedModes, :] *= -1
         tmpIn[solidReduc.latent_dim:,
               :] = self.calibrationQs[-1] @ tmpIn[solidReduc.latent_dim:, :]
         self.trainIn = collections.deque(tmpIn.T, maxlen=self.maxLen)
+
+        tmpOut = np.column_stack(self.trainOut)
+        tmpIn[self.reducLoadLocals[-1].pod.invertedModes, :] *= -1
         self.trainOut = collections.deque(
-            (self.calibrationQs[-1] @ np.column_stack(self.trainOut)).T, maxlen=self.maxLen)
+            (self.calibrationQs[-1] @ tmpOut).T, maxlen=self.maxLen)
 
         self.sendSignalBasis = self.calibrationQs[-1]
+
+        t1 = time.time()
+        self.updatingBasisTime.append(t1 - t0)
+        with open("./coSimData/tracked_updating_basis_time.npy", 'wb') as f:
+            np.save(f, np.array(self.updatingBasisTime))
+
+        if self.automatic_weight:
+            self._determine_automatic_omega()
+
+        print(" -- Omega terms are ", self.omega0, " --- \n")
+        print(" -- weight terms are ", self.reducLoad.weights, " --- \n")
+
+    def _determine_automatic_omega(self, ):
+        data_ratio = len(self.trainIn)/self.number_of_initial_snaps
+        if data_ratio < 0.5:
+            self.reducLoad.weights[self._p0:] = 0
+            self.reducLoad.weights /= np.sum(self.reducLoad.weights)
+        self.omega0 = 2 * (self.sigmoid(data_ratio, n=.1, eps=self.eps_for_automatic_weight) - 0.5).item()
+        self._omega_terms = (1-self.omega0, self.omega0)
 
     def _compute_calibrations(self, njobs=1, alg=None, already_computed_calibs=None):
         compute_calibs = True

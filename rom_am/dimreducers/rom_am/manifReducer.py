@@ -9,13 +9,13 @@ from scipy.interpolate import RBFInterpolator
 
 class ManifInterpReducer(RomDimensionalityReducer):
 
-    def __init__(self, latent_dim, ) -> None:
+    def __init__(self, latent_dim, m = 2) -> None:
         super().__init__(latent_dim)
         self.parametric = True
         self.weights = None
         self.calibrationQ = None
         self.pod = None
-        self._m = 2
+        self._m = m
         self.nx = None
 
     def train(self, bases_list: list[PodReducer], params, map_used=None, normalize=True, center=True, alg="svd", to_copy=True, to_copy_order='F', refP=0, kernel='thin_plate_spline', epsilon=None,
@@ -93,7 +93,7 @@ class ManifInterpReducer(RomDimensionalityReducer):
         self.weights = distsToPredictedBase**(-self._m)
         self.weights /= np.sum(self.weights)
 
-        self._orientationsAdjustment(bases_list, idClosestBase, already_computed_calibs=calibs)
+        #self._orientationsAdjustment(bases_list, idClosestBase, already_computed_calibs=calibs)
 
         return calibs
 
