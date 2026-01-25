@@ -221,7 +221,7 @@ class FluidSurrog:
             # for i in range(1, len(self.trainIn)):
             #     self.trainIn[i] = np.vstack((changeTheBasis @ self.trainIn[i][:solidReduc.latent_dim, [
             #                                 0]], self.trainIn[i][solidReduc.latent_dim:, [0]]))
-
+            self.countAugment = self.reTrainThres
 
         self.countAugment += 1
         if self.countAugment > self.reTrainThres:
