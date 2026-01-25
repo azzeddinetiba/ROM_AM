@@ -32,6 +32,7 @@ class TrackedFluidSurrog:
         self.reTrainThres = reTrainThres
         self.retrain_count = 0
         self.retrain_times = []
+        self.update_instants = []
         self.reTrainKernel = None
         self.reTrainSmoothing = None
         self._disp_latent_dim = None
@@ -235,9 +236,9 @@ class TrackedFluidSurrog:
 
             if self.countUpdate > self.updateThres:
                 if solidReduc is not None:
-                    self._updateLoadBasis(solidReduc)
+                    self._updateLoadBasis(solidReduc, current_t)
                 else:
-                    self._updateLoadBasis(self.reducDisp)
+                    self._updateLoadBasis(self.reducDisp, current_t)
                 self.countUpdate = 0
                 self.countAugment = 0
 
@@ -267,7 +268,7 @@ class TrackedFluidSurrog:
         with open("./coSimData/tracked_retraining_time.npy", 'wb') as f:
             np.save(f, np.array(self.retrainingTime))
 
-    def _updateLoadBasis(self, solidReduc: PodReducer):
+    def _updateLoadBasis(self, solidReduc: PodReducer, current_t=-1):
         print("=== - Updating the load basis - ===")
         t0 = time.time()
 
@@ -310,8 +311,9 @@ class TrackedFluidSurrog:
         if self.automatic_weight:
             self._determine_automatic_omega()
 
-        print(" -- Omega terms are ", self.omega0, " --- \n")
-        print(" -- weight terms are ", self.reducLoad.weights, " --- \n")
+        self.update_instants.append(current_t)
+        with open("./coSimData/tracked_update_instants.npy", 'wb') as f:
+            np.save(f, np.array(self.update_instants))
 
     def _determine_automatic_omega(self, ):
         data_ratio = len(self.trainIn)/self.number_of_initial_snaps
