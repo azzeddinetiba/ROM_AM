@@ -56,6 +56,8 @@ class TrackedFluidSurrog:
         self.update_omega_with_basis = update_omega_with_basis
         self.retrainingTime = []
         self.updatingBasisTime = []
+        self.updatingBasisCpuTime = []
+        self.retrainingCpuTime = []
         self.stacked_calib = None
         self.njobs_online = 1
         self.alg_square_matrices = alg_square_matrices
@@ -245,6 +247,7 @@ class TrackedFluidSurrog:
     def _reTrain(self, weights=True):
         print("=== - Retraining the Interpolator - ===")
         t0 = time.time()
+        t0c = time.process_time()
 
         if weights:
             n = len(self.trainIn)
@@ -263,13 +266,18 @@ class TrackedFluidSurrog:
         if self.automatic_weight:
             self._determine_automatic_omega()
 
+        t1c = time.process_time()
         t1 = time.time()
         self.retrainingTime.append(t1 - t0)
         with open("./coSimData/tracked_retraining_time.npy", 'wb') as f:
             np.save(f, np.array(self.retrainingTime))
+        self.retrainingCpuTime.append(t1c - t0c)
+        with open("./coSimData/tracked_retraining_CPUtime.npy", 'wb') as f:
+            np.save(f, np.array(self.retrainingCpuTime))
 
     def _updateLoadBasis(self, solidReduc: PodReducer, current_t=-1):
         print("=== - Updating the load basis - ===")
+        t0c = time.process_time()
         t0 = time.time()
 
         self.reducLoadLocals.append(copy.deepcopy(self.reducLoad))
@@ -304,9 +312,13 @@ class TrackedFluidSurrog:
         self.sendSignalBasis = self.calibrationQs[-1]
 
         t1 = time.time()
+        t1c = time.process_time()
         self.updatingBasisTime.append(t1 - t0)
+        self.updatingBasisCpuTime.append(t1c - t0c)
         with open("./coSimData/tracked_updating_basis_time.npy", 'wb') as f:
             np.save(f, np.array(self.updatingBasisTime))
+        with open("./coSimData/tracked_updating_basis_CPUtime.npy", 'wb') as f:
+            np.save(f, np.array(self.updatingBasisCpuTime))
 
         if self.automatic_weight:
             self._determine_automatic_omega()

@@ -40,6 +40,7 @@ class FluidSurrog:
         self._predictedBasis = None
         self.sendSignalBasis = None
         self.retrainingTime = []
+        self.retrainingCpuTime = []
 
     def sigmoid(self, x, n=1):
         s = int(n/2)
@@ -236,16 +237,21 @@ class FluidSurrog:
         print("=== - Retraining the Interpolator - ===")
 
         t0 = time.time()
+        t0c = time.process_time()
         if weights:
             n = len(self.trainIn)
             weights = self.sigmoid(np.arange(0, n), n)[::-1]
         else:
             weights = None
         self.regressor.train(np.column_stack(self.trainIn), np.column_stack(self.trainOut), weights=weights)
+        t1c = time.process_time()
         t1 = time.time()
         self.retrainingTime.append(t1 - t0)
         with open("./coSimData/retraining_time.npy", 'wb') as f:
             np.save(f, np.array(self.retrainingTime))
+        self.retrainingCpuTime.append(t1c - t0c)
+        with open("./coSimData/retraining_CPUtime.npy", 'wb') as f:
+            np.save(f, np.array(self.retrainingCpuTime))
 
     def predict(self, newDisp, newPrevLoad, input_u=None, solidReduc: RomDimensionalityReducer = None, params=None, k=None, nnls_tikhonov=None, predict_low_dimensional=False):
         assert (
