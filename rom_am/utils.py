@@ -40,10 +40,10 @@ def exp_U(U, delt):
 def angles(U, V, alg=None, compute_calibration=False):
     alg = _determine_pod_alg_square_matrices(alg, U.shape[1])
     prod = POD()
-    u, sig, vh = prod.decompose(U.T @ V, thin=True, alg=alg)
+    u, sig, vh = prod.decompose(V.T @ U, thin=True, alg=alg)
     calib = None
     if compute_calibration:
-        calib = vh.T @ u.T
+        calib = u @ vh
 
     return np.arccos(sig[sig<1]), calib
 
