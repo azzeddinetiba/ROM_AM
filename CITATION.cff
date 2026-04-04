@@ -1,0 +1,68 @@
+cff-version: 1.0.0
+title: "ROM_AM"
+message: "If you use this software, please cite it using the metadata below."
+type: software
+
+authors:
+  - family-names: "Tiba"
+    given-names: "Azzeddine"
+    orcid: "https://orcid.org/0000-0003-3578-141X0"
+
+repository-code: "https://github.com/azzeddinetiba/ROM_AM"
+license: BSD-3-Clause
+version: "0.2.0"
+date-released: "2023-30-09"
+
+abstract: >
+  Non-intrusive Reduced Order Modeling package using data-driven methods and Machine Learning.
+
+keywords:
+  - reduced order models
+  - scientific computing
+  - dynamic mode decomposition
+  - proper orthogonal decomposition
+  - reduced order models
+  - scientific machine learning
+  - non intrusive
+
+# --- Primary paper to cite when using the package ---
+preferred-citation:
+  type: article
+  title: "Machine-Learning Enhanced Predictors for Accelerated Convergence of Partitioned Fluid-Structure Interaction Simulations"
+  authors:
+    - family-names: "Tiba"
+      given-names: "Azzeddine"
+    - family-names: "Dairay"
+      given-names: "Thibault"
+    - family-names: "De Vuyst"
+      given-names: "Florian"
+    - family-names: "Mortazavi"
+      given-names: "Iraj"
+    - family-names: "Berro Ramirez"
+      given-names: "Juan Pedro"
+  journal: "Computer Physics Communications"
+  year: 2025
+  volume: 310
+  start: 109522
+  doi: "10.1016/j.cpc.2025.109522"
+  url: "https://doi.org/10.1016/j.cpc.2025.109522"
+
+# --- Second paper that also uses the package ---
+references:
+  - type: article
+    title: "Non-intrusive reduced order models for partitioned fluid–structure interactions"
+    authors:
+      - family-names: "Tiba"
+        given-names: "Azzeddine"
+      - family-names: "Dairay"
+        given-names: "Thibault"
+      - family-names: "De Vuyst"
+        given-names: "Florian"
+      - family-names: "Mortazavi"
+        given-names: "Iraj"
+      - family-names: "Berro Ramirez"
+        given-names: "Juan Pedro"
+    journal: "Journal of Fluids and Structures"
+    year: 2024
+    doi: "10.1016/j.jfluidstructs.2024.104156"
+    url: "https://doi.org/10.1016/j.jfluidstructs.2024.104156"
