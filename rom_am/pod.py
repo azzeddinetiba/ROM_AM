@@ -25,6 +25,8 @@ class POD:
         self.modes = None
         self.time = None
         self._pod_coeff = None
+        self.invertedModes = []
+        self.invertedModesAccumulated = []
 
     def decompose(self, X, alg="svd", rank=None, opt_trunc=False, tikhonov=0, thin=False):
         """Computes the proper orthogonal decomposition, training the model on the input data X.
@@ -143,6 +145,8 @@ class POD:
             vh = v.T
 
             u = X @ v[:, :rank] * s_inv
+        else:
+            raise AssertionError
 
         self.kept_rank = rank
 
@@ -212,12 +216,49 @@ class POD:
         """
         return self.modes @ new_reduced_data
 
+    def invertOrientation(self, modeId):
+
+        self.modes[:, modeId] *= -1
+        self.time[modeId, :] *= -1
+        if self._pod_coeff is not None:
+            self._pod_coeff[modeId, :] *= -1
+        self.invertedModes.append(modeId)
+        self.invertedModes = list(set(self.invertedModes))
+
+    def fillInvertedModesAccumulated(self):
+        self.invertedModesAccumulated = list(
+            set(self.invertedModesAccumulated).symmetric_difference(set(self.invertedModes)))
+
     @property
     def pod_coeff(self):
 
         if self._pod_coeff is None:
-            self._pod_coeff = np.diag(self.singvals) @ self.time
+            self._pod_coeff = (self.time.T * self.singvals).T
         return self._pod_coeff
+
+    @property
+    def modes_inverted(self):
+        modes = self.modes.copy()
+        modes[:, self.invertedModes] *= -1
+        return modes
+
+    @property
+    def modes_inverted_accumulated(self):
+        modes = self.modes.copy()
+        modes[:, self.invertedModesAccumulated] *= -1
+        return modes
+
+    def project_inverted(self, new_data):
+        return self.modes_inverted.T @ new_data
+
+    def project_inverted_accumulated(self, new_data):
+        return self.modes_inverted_accumulated.T @ new_data
+
+    def inverse_project_inverted(self, new_data):
+        return self.modes_inverted @ new_data
+
+    def inverse_project_inverted_accumulated(self, new_data):
+        return self.modes_inverted_accumulated @ new_data
 
     def _truncate(self, new_dim):
         self.modes = self.modes[:, :new_dim]

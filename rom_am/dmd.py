@@ -449,7 +449,7 @@ class DMD:
             if self.data is not None:
                 self._pod_coeff = self.modes.T @ self.data
             else:
-                self._pod_coeff = np.diag(self.singvals) @ self.time
+                self._pod_coeff = (self.time.T * self.singvals).T
         return self._pod_coeff
 
     @property
