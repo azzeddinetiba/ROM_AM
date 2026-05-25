@@ -117,6 +117,15 @@ dmypy.json
 DATA/**
 !DATA/**/
 !DATA/**/.gitkeep
+
+# Large example data files (optional downloads)
+examples/*.h5
+examples/*.vtk
+examples/*.npy
+examples/fixed_ntt/
+examples/fixed_last_t/
+
+# Reference media and data
 References/*.mp4
 References/*.pdf
 References/*/*.mp4
