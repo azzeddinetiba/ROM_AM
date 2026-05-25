@@ -157,6 +157,31 @@ class DMD:
                 idx = (np.abs(lambd)).argsort()[::-1]
             else:
                 idx = (np.real(lambd)).argsort()[::-1]
+            #  TODO:
+            # if sorting == "abs":
+            #     idx = np.array(
+            #         sorted(
+            #             range(lambd.shape[0]),
+            #             key=lambda i: (
+            #                 np.abs(lambd[i]),
+            #                 np.real(lambd[i]),
+            #                 np.imag(lambd[i]),
+            #             ),
+            #             reverse=True,
+            #         )
+            #     )
+            # else:
+            #     idx = np.array(
+            #         sorted(
+            #             range(lambd.shape[0]),
+            #             key=lambda i: (
+            #                 np.real(lambd[i]),
+            #                 np.abs(lambd[i]),
+            #                 np.imag(lambd[i]),
+            #             ),
+            #             reverse=True,
+            #         )
+            #     )
             lambd = lambd[idx]
             w = w[:, idx]
             self.low_dim_eig = w
