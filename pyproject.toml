@@ -9,7 +9,7 @@ description = "Non-intrusive Reduced Order Modeling packages"
 readme = "README.md"
 requires-python = ">=3.8"
 authors = [
-	{ name = "TIBA Azzeddine", email = "azzeddine.tiba@lecnam.net" }
+	{ name = "Azzeddine Tiba", email = "azzeddine.tiba@lecnam.net" }
 ]
 dependencies = [
 	"numpy>=1.20.3",
