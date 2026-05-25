@@ -33,7 +33,7 @@ class RDMDC:
         self.input_init = u_input[:, 0]
 
         # POD Decomposition of the X and Y matrix
-        self.pod = RPOD(self.lamnbdaForgetBasis)
+        self.pod = RPOD(self.lamnbdaForgetBasis, epsilon = self.epsilon)
         self.rom = ROM(self.pod)
         if precomp_mean is not None:
             self.rom.decompose(
