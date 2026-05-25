@@ -97,6 +97,11 @@ def test_eig_form_dmd():
 
 
 def test_eig_dmd():
-    print(np.linalg.norm(dmd.eigenvalues - correct_eigval))
-    assert np.allclose(dmd.lambd, correct_lambd, atol=5e-6) and np.allclose(
-        dmd.eigenvalues, correct_eigval, atol=1e-3)
+    lambd = np.sort_complex(dmd.lambd)
+    correct_lambd_ = np.sort_complex(correct_lambd)
+    eigvals = np.sort_complex(dmd.eigenvalues)
+    correct_eigvals = np.sort_complex(correct_eigval)
+
+    print(np.linalg.norm(eigvals - correct_eigvals))
+    assert np.allclose(lambd, correct_lambd_, atol=5e-6) and np.allclose(
+        eigvals, correct_eigvals, atol=1e-3)
