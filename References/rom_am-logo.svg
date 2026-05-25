@@ -1,26 +1,68 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
-  <!-- Background -->
-  <rect width="300" height="300" fill="#f0f4f8" rx="30" ry="30"/>
-  
-  <!-- Stylized Network/Reduction Representation -->
-  <g transform="translate(50, 100)">
-    <!-- Larger nodes representing full dimensional space -->
-    <circle cx="0" cy="50" r="20" fill="#3182ce" opacity="0.7"/>
-    <circle cx="100" cy="0" r="20" fill="#3182ce" opacity="0.7"/>
-    <circle cx="100" cy="100" r="20" fill="#3182ce" opacity="0.7"/>
-    
-    <!-- Smaller nodes representing reduced space -->
-    <circle cx="200" cy="50" r="10" fill="#63b3ed" opacity="0.9"/>
-    <circle cx="230" cy="50" r="10" fill="#63b3ed" opacity="0.9"/>
-    
-    <!-- Connecting lines to show dimensionality reduction -->
-    <line x1="20" y1="50" x2="180" y2="50" stroke="#4a5568" stroke-width="3" stroke-dasharray="5,5"/>
-    <line x1="120" y1="0" x2="200" y2="50" stroke="#4a5568" stroke-width="3" stroke-dasharray="5,5"/>
-    <line x1="120" y1="100" x2="230" y2="50" stroke="#4a5568" stroke-width="3" stroke-dasharray="5,5"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" role="img" aria-labelledby="title desc">
+  <title id="title">ROM_AM logo</title>
+  <desc id="desc">A compact mark showing high-dimensional data compressed into reduced-order dynamic modes.</desc>
+
+  <defs>
+    <linearGradient id="bg" x1="40" y1="24" x2="260" y2="276" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0b1f33"/>
+      <stop offset="1" stop-color="#143a59"/>
+    </linearGradient>
+    <linearGradient id="fullOrder" x1="62" y1="82" x2="128" y2="156" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#67e8f9"/>
+      <stop offset="1" stop-color="#2f7cf6"/>
+    </linearGradient>
+    <linearGradient id="reducedOrder" x1="178" y1="92" x2="252" y2="166" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffd166"/>
+      <stop offset="1" stop-color="#ff7b43"/>
+    </linearGradient>
+    <linearGradient id="flow" x1="122" y1="120" x2="214" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8be9fd" stop-opacity="0.2"/>
+      <stop offset="0.55" stop-color="#d7f4ff" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#ffd27d" stop-opacity="0.55"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="12" y="12" width="276" height="276" rx="40" fill="url(#bg)"/>
+  <rect x="24" y="24" width="252" height="252" rx="30" fill="none" stroke="#ffffff" stroke-opacity="0.08"/>
+
+  <g opacity="0.12" stroke="#d9f4ff" stroke-width="1">
+    <path d="M42 74H258"/>
+    <path d="M42 112H258"/>
+    <path d="M42 150H258"/>
+    <path d="M42 188H258"/>
   </g>
-  
-  <!-- Package Name Text -->
-  <text x="150" y="250" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#2d3748">
-    rom_am
-  </text>
+
+  <g transform="translate(0 6)">
+    <g fill="url(#fullOrder)">
+      <circle cx="74" cy="86" r="9"/>
+      <circle cx="102" cy="86" r="9" opacity="0.95"/>
+      <circle cx="130" cy="86" r="9" opacity="0.8"/>
+      <circle cx="74" cy="114" r="9" opacity="0.95"/>
+      <circle cx="102" cy="114" r="9"/>
+      <circle cx="130" cy="114" r="9" opacity="0.95"/>
+      <circle cx="74" cy="142" r="9" opacity="0.8"/>
+      <circle cx="102" cy="142" r="9" opacity="0.95"/>
+      <circle cx="130" cy="142" r="9"/>
+    </g>
+
+    <g stroke="url(#flow)" stroke-linecap="round" fill="none">
+      <path d="M126 86C154 86 164 98 186 104" stroke-width="8"/>
+      <path d="M126 114C156 114 166 114 188 114" stroke-width="10"/>
+      <path d="M126 142C154 142 164 130 186 124" stroke-width="8"/>
+    </g>
+
+    <path d="M171 114l-19-13v8h-17v10h17v8z" fill="#eef8ff" opacity="0.9"/>
+
+    <g>
+      <rect x="188" y="86" width="18" height="56" rx="9" fill="url(#reducedOrder)"/>
+      <rect x="218" y="72" width="18" height="84" rx="9" fill="url(#reducedOrder)"/>
+      <path d="M184 132c12-18 22-26 32-26s18 5 28 16" fill="none" stroke="#ffe7a5" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
+      <circle cx="244" cy="124" r="5" fill="#fff1c7"/>
+    </g>
+  </g>
+
+  <g transform="translate(150 232)">
+    <text text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="700" fill="#f5fbff" letter-spacing="1.6">ROM_AM</text>
+    <text y="22" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="10" font-weight="500" fill="#9dc7df" letter-spacing="2.8">REDUCED ORDER MODELING</text>
+  </g>
 </svg>
