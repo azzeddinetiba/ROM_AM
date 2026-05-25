@@ -114,20 +114,9 @@ dmypy.json
 .pyre/
 
 # Data Files
-DATA/*/*.txt
-DATA/*.mat
-DATA/*/*.mat
-!DATA/.gitkeep 
-DATA/*/*.csv
-DATA/*/*.h3d
-DATA/*/*.oml
-DATA/Parametric/*/*.npy
-DATA/nln_results_cont_coupl/*.npy
-DATA/Parametric/*/*.txt
-DATA/*/*/*.csv
-DATA/*/*/**.h3d
-DATA/*/*/*.oml
-DAYA/struc_doe_csv/
+DATA/**
+!DATA/**/
+!DATA/**/.gitkeep
 References/*.mp4
 References/*.pdf
 References/*/*.mp4
@@ -135,12 +124,8 @@ References/*/*.pdf
 References/*/*.h5
 References/*/*.vtk
 
-DATA/*/*.npy
 /Figures/*
 /examples/fsi_test_case figures.ipynb
-DATA/*/*.csv
-DATA/*/*.h3d
-DATA/*/*.oml
 
 .idea/
 *.DS_Store
