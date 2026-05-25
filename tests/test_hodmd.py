@@ -13,7 +13,7 @@ Y = np.load("./tests/DATA/hodmd_train_Y.npy")
 
 dt = 6e-4
 hodmd = HODMD()
-hodmd.decompose(X, Y=Y, dt=dt, hod=100,)
+hodmd.decompose(X, Y=Y, dt=dt, hod=10, sorting="abs")
 
 
 def test_hodmd_decomposition():
