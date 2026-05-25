@@ -1,5 +1,37 @@
-# pyproject.toml
 [build-system]
-# XXX: If your project needs other packages to build properly, add them to this list.
-requires = ["setuptools >= 42.0.0"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "ROM_AM"
+version = "0.2"
+description = "Non-intrusive Reduced Order Modeling packages"
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [
+	{ name = "TIBA Azzeddine", email = "azzeddine.tiba@lecnam.net" }
+]
+dependencies = [
+	"numpy>=1.20.3",
+	"scipy>=1.7.1",
+	"jax>=0.2.26; platform_system == 'Linux'",
+	"jaxlib>=0.1.75; platform_system == 'Linux'"
+]
+
+[project.optional-dependencies]
+visualization = [
+	"matplotlib>=3.4.3",
+	"scikit-learn>=1.2.2"
+]
+deep-learning = [
+	"torch>=2.0.0",
+	"torchvision>=0.15.1"
+]
+
+[tool.setuptools]
+packages = [
+	"rom_am",
+	"rom_am.regressors",
+	"rom_am.dimreducers",
+	"rom_am.dimreducers.rom_am"
+]

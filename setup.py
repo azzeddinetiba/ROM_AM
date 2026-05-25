@@ -1,25 +1,4 @@
-from setuptools import find_packages, setup
+from setuptools import setup
 
 
-setup(
-    name='ROM_AM',
-    version='0.2',
-    description='Non-intrusive Reduced Order Modeling packages',
-    author='TIBA Azzeddine',
-    author_email='azzeddine.tiba@lecnam.net',
-    packages=['rom_am', 'rom_am.regressors', 'rom_am.dimreducers', 'rom_am.dimreducers.rom_am'],
-    # external packages as dependencies
-    install_requires=['numpy >= 1.20.3', 'scipy >= 1.7.1',
-                      'jax >= 0.2.26 ; platform_system=="linux"',
-                      'jaxlib >= 0.1.75 ; platform_system=="linux"'],
-    extras_require={
-        'visualization': [
-            'matplotlib >= 3.4.3',
-            'scikit-learn >= 1.2.2',
-        ],
-        'deep-learning': [
-            'torch >= 2.0.0',
-            'torchvision >= 0.15.1',
-        ],
-    },
-)
+setup()
