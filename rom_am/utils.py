@@ -76,21 +76,56 @@ def rank1_update(basis:np.ndarray, new_vectors: np.ndarray, stepsize = None):
 
     """
 
-    w = basis.T @ new_vectors
-    p = basis @ w
-    r = new_vectors - p
-    r_norm = np.linalg.norm(r)
-    p_norm = np.linalg.norm(p)
+    # w = basis.T @ new_vectors
+    # p = basis @ w
+    # r = new_vectors - p
+    # r_norm = np.linalg.norm(r)
+    # p_norm = np.linalg.norm(p)
+
+    # if stepsize is None:
+    #     stepsize_ = np.arcsin(r_norm/p_norm)
+    # else:
+    #     if stepsize == "complete":
+    #         stepsize_ = np.arcsin(r_norm/np.linalg.norm(new_vectors))
+    #     else:
+    #         stepsize_ = stepsize * (r_norm * p_norm)
+
+    # w_norm = np.linalg.norm(w)
+    # coeff1 = (np.cos(stepsize_) - 1) / p_norm
+    # coeff2 = np.sin(stepsize_) / r_norm
+    # basis += (coeff1 * p + coeff2 * r) @ (w.T / w_norm)
+    # Work with 1D arrays to avoid 2D broadcasting overhead
+    v = new_vectors.ravel()
+    w = basis.T @ v          # (r,)
+    p = basis @ w            # (n,)
+    r = v - p                # (n,)
+
+    # Norms via dot products (faster than np.linalg.norm for real 1D arrays)
+    r_norm = np.sqrt(np.dot(r, r))
+    p_norm = np.sqrt(np.dot(p, p))
 
     if stepsize is None:
-        stepsize_ = np.arcsin(r_norm/p_norm)
+        stepsize_ = np.arcsin(r_norm / p_norm)
     else:
-        stepsize_ = stepsize * (r_norm * p_norm)
+        if stepsize == "complete":
+            stepsize_ = np.arcsin(r_norm / np.sqrt(np.dot(v, v)))
+        else:
+            stepsize_ = stepsize * (r_norm * p_norm)
 
-    w_norm = np.linalg.norm(w)
+    w_norm = np.sqrt(np.dot(w, w))
     coeff1 = (np.cos(stepsize_) - 1) / p_norm
     coeff2 = np.sin(stepsize_) / r_norm
-    basis += (coeff1 * p + coeff2 * r) @ (w.T / w_norm)
+
+    # Build direction vector in-place (reuse p and r buffers)
+    p *= coeff1
+    r *= coeff2
+    p += r  # p is now the combined direction
+
+    # Build scale vector in-place (reuse w buffer)
+    w *= (1.0 / w_norm)
+
+    # Rank-1 update via outer product
+    basis += np.outer(p, w)
 
 def cnvx_nnls(z, Z, ksi=1e5, mu=None):
     """Solving a non negative linear square problem

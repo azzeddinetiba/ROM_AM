@@ -67,6 +67,7 @@ class TrackedFluidSurrog:
         self.number_of_initial_snaps = 1
         self._p0 = None
         self.eps_for_automatic_weight = eps_for_automatic_weight
+        self.L = None
 
     def sigmoid(self, x, n=1, eps=0.1):
         s = int(n/2)
@@ -193,7 +194,8 @@ class TrackedFluidSurrog:
                     params=None,
                     solidReduc: RomDimensionalityReducer = None,
                     stepsize=None,
-                    computeAngle=False):
+                    computeAngle=False,
+                    update_method=None):
         self.sendSignalBasis = None
 
         if not self._predictedBasis:
@@ -223,14 +225,17 @@ class TrackedFluidSurrog:
 
         if self.updateBasis:
             self.countUpdate += 1
-            # self.cloneBasis, self.L = _compute_past(
-            #     self.cloneBasis, self.L, self.reducLoad.rom.normalize(
-            #         self.reducLoad.rom.center(newfluidData)),
-            #     0.99)
             if computeAngle:
                 tmpBasis = self.cloneBasis.copy()
-            rank1_update(self.cloneBasis, self.reducLoad.rom.normalize(
-                self.reducLoad.rom.center(newfluidData)), stepsize)
+            if update_method is None:
+                rank1_update(self.cloneBasis, self.reducLoad.rom.normalize(
+                    self.reducLoad.rom.center(newfluidData)), stepsize)
+            else:
+                if self.L is None:
+                    self.L = 0.01 * np.eye(self.reducLoad.latent_dim)
+                self.cloneBasis, self.L = _compute_past(
+                    self.cloneBasis, self.L, self.reducLoad.rom.normalize(
+                        self.reducLoad.rom.center(newfluidData)), 0.95)
             # indicator = np.linalg.norm(self.cloneBasis.T @ self.cloneBasis - np.eye(self.reducLoad.latent_dim))
             if computeAngle:
                 self.recursive_angles.append(
