@@ -1,6 +1,18 @@
 # ROM_AM
 
- ![example workflow](https://github.com/azzeddinetiba/ROM_AM/actions/workflows/python-app.yml/badge.svg)
+![example workflow](https://github.com/azzeddinetiba/ROM_AM/actions/workflows/python-app.yml/badge.svg) <!-- Python versions supported -->
+![Python Versions](https://img.shields.io/badge/python-%3E%3D3.8-blue)
+
+<!-- Last commit -->
+![Last Commit](https://img.shields.io/github/last-commit/azzeddinetiba/ROM_AM) <!-- Open issues -->
+![Issues](https://img.shields.io/github/issues/azzeddinetiba/ROM_AM)
+
+<!-- Stars -->
+![Stars](https://img.shields.io/github/stars/azzeddinetiba/ROM_AM?style=social)
+
+<!-- License -->
+![License](https://img.shields.io/github/license/azzeddinetiba/ROM_AM) <!-- DOI (if published on Zenodo) -->
+[![DOI](https://zenodo.org/badge/DOI/10.1016/j.cpc.2025.109522.svg)](https://doi.org/10.1016/j.cpc.2025.109522)
 
 <p align="center">
 <img src="./References/rom_am-logo.svg" alt="Alt Text" width="300" height="200">
@@ -18,7 +30,7 @@ pip install .
 ```
 
 **Tested on:** Windows 10, Ubuntu 20.04, and macOS 12.0+  
-**Python versions:** 3.8 and 3.9
+**Python versions:** 3.8, 3.9 and 3.13
 
 ### Example Data Files (Optional)
 
