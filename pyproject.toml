@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=61.0", "setuptools-scm>=8.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "ROM_AM"
-version = "0.2"
+dynamic = ["version"]
 description = "Non-intrusive Reduced Order Modeling packages"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -35,3 +35,5 @@ packages = [
 	"rom_am.dimreducers",
 	"rom_am.dimreducers.rom_am"
 ]
+
+[tool.setuptools-scm]
