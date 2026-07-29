@@ -18,12 +18,14 @@ from rom_am.rpod import _compute_past
 import time
 from joblib import Parallel, delayed
 from importlib.metadata import version
+import os
 
 class TrackedFluidSurrog:
 
     def __init__(self, maxLen=6900, reTrainThres=240, parametric=False, updateBasis=False, updateThres=300,
                  updateOmega=False, njobs_online=1, alg_square_matrices=None, m=2, update_omega_with_basis=False,
-                 automatic_weight=False, automatic_weight_at_retrain = False, eps_for_automatic_weight=2.):
+                 automatic_weight=False, automatic_weight_at_retrain = False, eps_for_automatic_weight=2.,
+                 output_folder=None):
         self.trainIn = collections.deque(maxlen=maxLen)
         self.trainOut = collections.deque(maxlen=maxLen)
         self.maxLen = maxLen
@@ -68,6 +70,10 @@ class TrackedFluidSurrog:
         self._p0 = None
         self.eps_for_automatic_weight = eps_for_automatic_weight
         self.L = None
+        self.output_folder = output_folder
+        if self.output_folder is None:
+            self.output_folder = 'coSimData'
+        os.makedirs("./"+self.output_folder, exist_ok=True)
 
     def sigmoid(self, x, n=1, eps=0.1):
         s = int(n/2)
@@ -222,7 +228,7 @@ class TrackedFluidSurrog:
             self.retrain_count += 1
             self.retrain_times.append(current_t)
             self.countAugment = 0
-            with open("./coSimData/tracked_retraining_instants.npy", 'wb') as f:
+            with open(self.output_folder+"/tracked_retraining_instants.npy", 'wb') as f:
                 np.save(f, np.array(self.retrain_times))
 
         if self.updateBasis:
@@ -276,10 +282,10 @@ class TrackedFluidSurrog:
         t1c = time.process_time()
         t1 = time.time()
         self.retrainingTime.append(t1 - t0)
-        with open("./coSimData/tracked_retraining_time.npy", 'wb') as f:
+        with open(self.output_folder+"/tracked_retraining_time.npy", 'wb') as f:
             np.save(f, np.array(self.retrainingTime))
         self.retrainingCpuTime.append(t1c - t0c)
-        with open("./coSimData/tracked_retraining_CPUtime.npy", 'wb') as f:
+        with open(self.output_folder+"/tracked_retraining_CPUtime.npy", 'wb') as f:
             np.save(f, np.array(self.retrainingCpuTime))
 
     def _updateLoadBasis(self, solidReduc: PodReducer, current_t=-1):
@@ -322,16 +328,16 @@ class TrackedFluidSurrog:
         t1c = time.process_time()
         self.updatingBasisTime.append(t1 - t0)
         self.updatingBasisCpuTime.append(t1c - t0c)
-        with open("./coSimData/tracked_updating_basis_time.npy", 'wb') as f:
+        with open(self.output_folder+"/tracked_updating_basis_time.npy", 'wb') as f:
             np.save(f, np.array(self.updatingBasisTime))
-        with open("./coSimData/tracked_updating_basis_CPUtime.npy", 'wb') as f:
+        with open(self.output_folder+"/tracked_updating_basis_CPUtime.npy", 'wb') as f:
             np.save(f, np.array(self.updatingBasisCpuTime))
 
         if self.automatic_weight:
             self._determine_automatic_omega()
 
         self.update_instants.append(current_t)
-        with open("./coSimData/tracked_update_instants.npy", 'wb') as f:
+        with open(self.output_folder+"/tracked_update_instants.npy", 'wb') as f:
             np.save(f, np.array(self.update_instants))
 
     def _determine_automatic_omega(self, ):
