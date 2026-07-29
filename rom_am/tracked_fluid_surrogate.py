@@ -17,7 +17,7 @@ from rom_am.utils import rank1_update, _determine_pod_alg_square_matrices, angle
 from rom_am.rpod import _compute_past
 import time
 from joblib import Parallel, delayed
-
+from importlib.metadata import version
 
 class TrackedFluidSurrog:
 
@@ -185,6 +185,8 @@ class TrackedFluidSurrog:
             scaleTree.fit(params.T)
             self.scaleTree = scaleTree
             self.param_tree = KDTree(scaleTree.transform(params.T))
+
+        self.version_on_training = version("rom_am")
 
     def augmentData(self,
                     newdispData,
