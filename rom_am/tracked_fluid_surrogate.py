@@ -70,6 +70,7 @@ class TrackedFluidSurrog:
         self._p0 = None
         self.eps_for_automatic_weight = eps_for_automatic_weight
         self.L = None
+        self.rank_one_update_times = []
         self.output_folder = output_folder
         if self.output_folder is None:
             self.output_folder = 'coSimData'
@@ -235,6 +236,7 @@ class TrackedFluidSurrog:
             self.countUpdate += 1
             if computeAngle:
                 tmpBasis = self.cloneBasis.copy()
+            t0 = time.time()
             if update_method is None:
                 rank1_update(self.cloneBasis, self.reducLoad.rom.normalize(
                     self.reducLoad.rom.center(newfluidData)), stepsize)
@@ -244,6 +246,8 @@ class TrackedFluidSurrog:
                 self.cloneBasis, self.L = _compute_past(
                     self.cloneBasis, self.L, self.reducLoad.rom.normalize(
                         self.reducLoad.rom.center(newfluidData)), 0.95)
+            t1 = time.time()
+            self.rank_one_update_times.append(t1-t0)
             # indicator = np.linalg.norm(self.cloneBasis.T @ self.cloneBasis - np.eye(self.reducLoad.latent_dim))
             if computeAngle:
                 self.recursive_angles.append(
