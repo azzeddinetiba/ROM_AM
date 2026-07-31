@@ -14,11 +14,12 @@ import copy
 from scipy.spatial import KDTree
 from sklearn.preprocessing import MinMaxScaler
 import time
+import os
 
 
 class FluidSurrog:
 
-    def __init__(self, maxLen=6900, reTrainThres=240, parametric=False):
+    def __init__(self, maxLen=6900, reTrainThres=240, parametric=False, output_folder=None):
         self.trainIn = collections.deque(maxlen=maxLen)
         self.trainOut = collections.deque(maxlen=maxLen)
         self.maxLen = maxLen
@@ -41,6 +42,10 @@ class FluidSurrog:
         self.sendSignalBasis = None
         self.retrainingTime = []
         self.retrainingCpuTime = []
+        self.output_folder = output_folder
+        if self.output_folder is None:
+            self.output_folder = 'coSimData'
+        os.makedirs("./"+self.output_folder, exist_ok=True)
 
     def sigmoid(self, x, n=1):
         s = int(n/2)
@@ -230,7 +235,7 @@ class FluidSurrog:
             self.retrain_count += 1
             self.retrain_times.append(current_t)
             self.countAugment = 0
-            with open("./coSimData/retraining_instants.npy", 'wb') as f:
+            with open(self.output_folder+"/retraining_instants.npy", 'wb') as f:
                 np.save(f, np.array(self.retrain_times))
 
     def _reTrain(self, weights=True):
@@ -247,10 +252,10 @@ class FluidSurrog:
         t1c = time.process_time()
         t1 = time.time()
         self.retrainingTime.append(t1 - t0)
-        with open("./coSimData/retraining_time.npy", 'wb') as f:
+        with open(self.output_folder+"/retraining_time.npy", 'wb') as f:
             np.save(f, np.array(self.retrainingTime))
         self.retrainingCpuTime.append(t1c - t0c)
-        with open("./coSimData/retraining_CPUtime.npy", 'wb') as f:
+        with open(self.output_folder+"/retraining_CPUtime.npy", 'wb') as f:
             np.save(f, np.array(self.retrainingCpuTime))
 
     def predict(self, newDisp, newPrevLoad, input_u=None, solidReduc: RomDimensionalityReducer = None, params=None, k=None, nnls_tikhonov=None, predict_low_dimensional=False):

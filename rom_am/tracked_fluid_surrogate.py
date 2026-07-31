@@ -20,6 +20,7 @@ from joblib import Parallel, delayed
 from importlib.metadata import version
 import os
 
+
 class TrackedFluidSurrog:
 
     def __init__(self, maxLen=6900, reTrainThres=240, parametric=False, updateBasis=False, updateThres=300,
