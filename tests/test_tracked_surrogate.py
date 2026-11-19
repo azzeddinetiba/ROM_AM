@@ -3,6 +3,8 @@ Tests for rom_am/tracked_fluid_surrogate.py
 """
 
 import os
+import sys
+from types import SimpleNamespace
 import pytest
 import numpy as np
 from numpy.testing import assert_allclose
@@ -10,6 +12,7 @@ from unittest.mock import patch, MagicMock
 from helpers import _make_synthetic_data
 
 from rom_am.tracked_fluid_surrogate import TrackedFluidSurrog
+import rom_am.tracked_fluid_surrogate as surrogate_module
 
 # ── shared fixture ────────────────────────────────────────────────────────────
 
@@ -184,6 +187,97 @@ class TestTrackedFluidSurrogPredict:
 
 
 class TestTrackedFluidSurrogComputeCalibrations:
+
+    @pytest.fixture
+    def calibration_case(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        surrog = TrackedFluidSurrog()
+        matrices = [
+            np.random.default_rng(42).standard_normal((4, 4)),
+            np.diag([2., 1., 1e-12, 0.]),
+            np.zeros((4, 4)),
+        ]
+        surrog.reducLoad = SimpleNamespace(pod=SimpleNamespace(modes=np.eye(4)))
+        surrog.reducLoadLocals = [
+            SimpleNamespace(pod=SimpleNamespace(modes=matrix)) for matrix in matrices
+        ]
+        expected = []
+        for matrix in matrices:
+            u, _, vh = surrogate_module.POD().decompose(matrix, alg="svd")
+            expected.append(u @ vh)
+        return surrog, np.stack(expected)
+
+    @pytest.mark.skipif(surrogate_module._batched_calibrations is None, reason="Requires Linux JAX")
+    @pytest.mark.parametrize("algorithm", [None, "svd"])
+    def test_batched_svd_matches_pod(self, calibration_case, monkeypatch, algorithm):
+        from threadpoolctl import threadpool_info
+
+        surrog, expected = calibration_case
+        monkeypatch.setenv("ROM_AM_SVD_THREADS", "2")
+        original = surrogate_module._batched_calibrations
+
+        def checked_batch(products):
+            pools = [p for p in threadpool_info() if p["user_api"] == "blas"]
+            assert pools and all(p["num_threads"] == 2 for p in pools)
+            return original(products)
+
+        monkeypatch.setattr(surrogate_module, "_batched_calibrations", checked_batch)
+        with patch.object(surrogate_module, "Parallel") as parallel:
+            before = threadpool_info()
+            surrog._compute_calibrations(alg=algorithm)
+            assert threadpool_info() == before
+            parallel.assert_not_called()
+        assert isinstance(surrog.calibrationQs, list)
+        assert all(isinstance(q, np.ndarray) for q in surrog.calibrationQs)
+        assert_allclose(surrog.stacked_calib, expected, atol=1e-12)
+        assert_allclose(surrog.stacked_calib[1], np.diag([1., 1., 0., 0.]), atol=1e-12)
+        assert_allclose(surrog.stacked_calib[2], np.zeros((4, 4)), atol=1e-12)
+
+    @pytest.mark.parametrize("gil_enabled", [True, False, None])
+    def test_no_jax_backend_selection(self, calibration_case, monkeypatch, gil_enabled):
+        surrog, expected = calibration_case
+        monkeypatch.setattr(surrogate_module, "_batched_calibrations", None)
+        monkeypatch.setattr(surrogate_module.pod_module, "os_", 1)
+        monkeypatch.setattr(surrogate_module.pod_module, "_physical_core_count", lambda: 2)
+        if gil_enabled is None:
+            monkeypatch.delattr(sys, "_is_gil_enabled", raising=False)
+        else:
+            monkeypatch.setattr(sys, "_is_gil_enabled", lambda: gil_enabled, raising=False)
+        with patch.object(surrogate_module, "Parallel", wraps=surrogate_module.Parallel) as parallel, \
+             patch.object(surrogate_module, "ThreadPoolExecutor",
+                          wraps=surrogate_module.ThreadPoolExecutor) as executor:
+            surrog._compute_calibrations(njobs=1, alg="svd")
+        if gil_enabled is False:
+            executor.assert_called_once_with(max_workers=2)
+            parallel.assert_not_called()
+        else:
+            parallel.assert_called_once_with(n_jobs=1, backend="loky", prefer="threads")
+            executor.assert_not_called()
+        assert_allclose(surrog.stacked_calib, expected, atol=1e-12)
+
+    def test_explicit_snapshot_bypasses_batch(self, calibration_case):
+        surrog, _ = calibration_case
+        with patch.object(surrogate_module, "_batched_calibrations") as batch:
+            surrog._compute_calibrations(alg="snap")
+            batch.assert_not_called()
+        expected = []
+        for local in surrog.reducLoadLocals:
+            u, _, vh = surrogate_module.POD().decompose(local.pod.modes, alg="snap")
+            expected.append(u @ vh)
+        assert_allclose(surrog.stacked_calib, expected, atol=1e-12)
+
+    def test_precomputed_calibrations_bypass_backends(self, calibration_case):
+        surrog, expected = calibration_case
+        precomputed = list(expected)
+        with patch.object(surrogate_module, "_batched_calibrations") as batch, \
+             patch.object(surrogate_module, "Parallel") as parallel, \
+             patch.object(surrogate_module, "ThreadPoolExecutor") as executor:
+            surrog._compute_calibrations(already_computed_calibs=precomputed)
+            batch.assert_not_called()
+            parallel.assert_not_called()
+            executor.assert_not_called()
+        assert surrog.calibrationQs is precomputed
+        assert_allclose(surrog.stacked_calib, expected)
 
     def test_calibration_unitary(self, trained_surrogate):
         surrog, *_ = trained_surrogate

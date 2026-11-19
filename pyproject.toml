@@ -17,8 +17,8 @@ dependencies = [
 	"scikit-learn>=1.2.2",
 	"jax>=0.2.26; platform_system == 'Linux'",
 	"jaxlib>=0.1.75; platform_system == 'Linux'",
-	"psutil>=5.8; platform_system == 'Linux'",
-	"threadpoolctl>=3.1; platform_system == 'Linux'"
+	"psutil>=5.8",
+	"threadpoolctl>=3.1"
 ]
 
 [project.optional-dependencies]

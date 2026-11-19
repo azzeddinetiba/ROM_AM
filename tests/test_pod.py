@@ -1,4 +1,5 @@
 import sys
+import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 
@@ -26,6 +27,13 @@ def test_svd_unknown_physical_cores(monkeypatch):
     monkeypatch.setattr(pod_module.psutil, "cpu_count", lambda logical: None)
     with pytest.warns(RuntimeWarning, match="Could not detect physical CPU cores"):
         assert pod_module._svd_thread_count() == 1
+
+
+def test_physical_cores_without_linux_affinity(monkeypatch):
+    monkeypatch.delattr(pod_module.os, "sched_getaffinity", raising=False)
+    monkeypatch.setattr(pod_module.psutil, "cpu_count", lambda logical: 6)
+    monkeypatch.setattr(pod_module.os, "cpu_count", lambda: 4)
+    assert pod_module._physical_core_count() == 4
 
 
 @pytest.mark.skipif("linux" not in sys.platform, reason="Linux SVD threading")
@@ -94,3 +102,34 @@ def test_other_paths_ignore_linux_thread_override(monkeypatch, algorithm, platfo
     model = POD()
     model.decompose(np.eye(3), alg=algorithm)
     np.testing.assert_allclose(model.reconstruct(), np.eye(3), atol=1e-12)
+
+
+@pytest.mark.skipif("linux" not in sys.platform, reason="Linux optional JAX")
+def test_missing_jax_uses_scipy():
+    code = """
+import builtins
+import warnings
+from types import SimpleNamespace
+original_import = builtins.__import__
+def without_jax(name, *args, **kwargs):
+    if name == "jax" or name.startswith("jax."):
+        raise ModuleNotFoundError("No module named 'jax'", name="jax")
+    return original_import(name, *args, **kwargs)
+builtins.__import__ = without_jax
+with warnings.catch_warnings(record=True) as caught:
+    warnings.simplefilter("always")
+    import rom_am.pod as pod
+assert pod.jax is None and pod.os_ == 1
+assert any("JAX is unavailable" in str(w.message) for w in caught)
+model = pod.POD()
+model.decompose(pod.np.eye(3))
+pod.np.testing.assert_allclose(model.reconstruct(), pod.np.eye(3))
+from rom_am.tracked_fluid_surrogate import TrackedFluidSurrog, _batched_calibrations
+assert _batched_calibrations is None
+surrog = TrackedFluidSurrog.__new__(TrackedFluidSurrog)
+surrog.reducLoad = SimpleNamespace(pod=SimpleNamespace(modes=pod.np.eye(3)))
+surrog.reducLoadLocals = [surrog.reducLoad]
+surrog._compute_calibrations(alg="svd")
+pod.np.testing.assert_allclose(surrog.stacked_calib, [pod.np.eye(3)])
+"""
+    subprocess.run([sys.executable, "-c", code], check=True, capture_output=True, text=True)

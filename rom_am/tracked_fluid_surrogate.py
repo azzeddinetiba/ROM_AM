@@ -13,12 +13,24 @@ import copy
 from scipy.spatial import KDTree
 from sklearn.preprocessing import MinMaxScaler
 from rom_am.pod import POD
+from rom_am import pod as pod_module
 from rom_am.utils import rank1_update, _determine_pod_alg_square_matrices, angles
 from rom_am.rpod import _compute_past
 import time
 from joblib import Parallel, delayed
 from importlib.metadata import version
 import os
+import sys
+from concurrent.futures import ThreadPoolExecutor
+
+
+if pod_module.jax is not None:
+    @pod_module.jax.jit
+    def _batched_calibrations(products):
+        u, s, vh = pod_module.jnp.linalg.svd(products, full_matrices=False)
+        return (u * (s > 1e-10)[..., None, :]) @ vh
+else:
+    _batched_calibrations = None
 
 
 class TrackedFluidSurrog:
@@ -354,23 +366,49 @@ class TrackedFluidSurrog:
         self._omega_terms = (1-self.omega0, self.omega0)
 
     def _compute_calibrations(self, njobs=1, alg=None, already_computed_calibs=None):
+        """Calibrate local bases, reusing supplied calibrations when available.
+
+        Linux with JAX defaults to batched JIT SVD; explicit ``alg="snap"``
+        retains the snapshot algorithm. Without JAX, GIL-disabled Python uses
+        physical-core threads with one BLAS thread per worker; GIL-enabled
+        Python retains the loky backend and ``njobs``. Batched JAX shares POD's
+        temporary, process-wide BLAS limits and waits before restoring them.
+        """
         compute_calibs = True
         if already_computed_calibs is not None:
             compute_calibs = False
             if already_computed_calibs[0] is None:
                 compute_calibs = True
         if compute_calibs:
-            alg = _determine_pod_alg_square_matrices(alg=alg, size_=self.reducLoad.pod.modes.shape[1])
-            def _core_calibration_computation(currentReducLoadBasis, localReducLoad):
-                prod = POD()
-                u, _, vh = prod.decompose(
-                    currentReducLoadBasis.T @ localReducLoad.pod.modes, thin=False, alg=alg)
-                return u @ vh
+            current_basis = self.reducLoad.pod.modes
+            if _batched_calibrations is not None and alg in (None, "svd"):
+                with pod_module._svd_lock, pod_module._blas_threadpools().limit(
+                        limits=pod_module._svd_thread_count(), user_api="blas"):
+                    products = np.stack([
+                        current_basis.T @ local.pod.modes for local in self.reducLoadLocals
+                    ])
+                    calibrations = np.array(_batched_calibrations(products))
+                self.calibrationQs = list(calibrations)
+            else:
+                alg = _determine_pod_alg_square_matrices(alg=alg, size_=current_basis.shape[1])
 
-            self.calibrationQs = Parallel(n_jobs=njobs, backend='loky', prefer='threads')(
-                delayed(_core_calibration_computation)(self.reducLoad.pod.modes, local)
-                for local in self.reducLoadLocals
-            )
+                def _core_calibration_computation(localReducLoad):
+                    prod = POD()
+                    u, _, vh = prod.decompose(
+                        current_basis.T @ localReducLoad.pod.modes, thin=False, alg=alg)
+                    return u @ vh
+
+                if _batched_calibrations is None and not getattr(sys, "_is_gil_enabled", lambda: True)():
+                    # Limit nested BLAS parallelism outside the worker threads.
+                    with pod_module._svd_lock, pod_module._blas_threadpools().limit(limits=1, user_api="blas"):
+                        with ThreadPoolExecutor(max_workers=pod_module._physical_core_count()) as pool:
+                            self.calibrationQs = list(pool.map(
+                                _core_calibration_computation, self.reducLoadLocals))
+                else:
+                    self.calibrationQs = Parallel(n_jobs=njobs, backend='loky', prefer='threads')(
+                        delayed(_core_calibration_computation)(local)
+                        for local in self.reducLoadLocals
+                    )
         else:
             self.calibrationQs=already_computed_calibs
         self.stacked_calib = np.stack(self.calibrationQs)
