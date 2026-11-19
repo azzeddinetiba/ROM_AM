@@ -10,6 +10,29 @@ import rom_am.pod as pod_module
 from rom_am.pod import POD
 
 
+@pytest.mark.parametrize("alg", ["svd", "snap"])
+def test_pod_decomposition_and_reconstruction(alg):
+    data = np.array([[3., 0., 0.], [4., 0., 0.], [0., 0., 2.], [0., 0., 0.]])
+    model = POD()
+    u, s, vh = model.decompose(data, alg=alg)
+
+    assert model.kept_rank == 2
+    assert u.shape == (4, 2) and vh.shape == (2, 3)
+    np.testing.assert_allclose(s, [5., 2.], atol=1e-12)
+    np.testing.assert_allclose(u.T @ u, np.eye(2), atol=1e-12)
+    np.testing.assert_allclose(model.reconstruct(), data, atol=1e-12)
+
+
+@pytest.mark.parametrize("alg", ["svd", "snap"])
+def test_pod_rank_truncation(alg):
+    model = POD()
+    model.decompose(np.diag([5., 2., 1.]), alg=alg, rank=2)
+
+    assert model.kept_rank == 2
+    np.testing.assert_allclose(model.singvals, [5., 2.], atol=1e-12)
+    np.testing.assert_allclose(model.reconstruct(), np.diag([5., 2., 0.]), atol=1e-12)
+
+
 @pytest.mark.skipif("linux" not in sys.platform, reason="Linux SVD threading")
 @pytest.mark.parametrize(
     "physical,available,expected", [(6, 12, 6), (6, 2, 2), (6, 6, 6)]
