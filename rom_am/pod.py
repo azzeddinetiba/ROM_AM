@@ -1,16 +1,65 @@
 import numpy as np
 import scipy.linalg as sp
+import os
 import sys
 import warnings
+from threading import Lock
+from functools import lru_cache
+
+import psutil
+from threadpoolctl import ThreadpoolController
 
 os_ = 1
+jax = None
+jnp = None
+_svd_lock = Lock()
 if "linux" in sys.platform:
-    os_ = 0
-    import jax.numpy as jnp
-    import jax
+    try:
+        import jax
+        import jax.numpy as jnp
+    except ModuleNotFoundError as exc:
+        if exc.name not in ("jax", "jaxlib"):
+            raise
+        jax = None
+        jnp = None
+        warnings.warn("JAX is unavailable; using SciPy SVD on Linux.", RuntimeWarning)
+    else:
+        os_ = 0
+        jax.config.update("jax_platform_name", "cpu")
+        jax.config.update("jax_enable_x64", True)
 
-    jax.config.update("jax_platform_name", "cpu")
-    jax.config.update("jax_enable_x64", True)
+
+@lru_cache(maxsize=1)
+def _blas_threadpools():
+    # Discover loaded BLAS libraries once, after NumPy and SciPy have imported.
+    return ThreadpoolController()
+
+
+def _physical_core_count():
+    physical_cores = psutil.cpu_count(logical=False)
+    if physical_cores is None:
+        warnings.warn("Could not detect physical CPU cores; using one worker. "
+                      "Set ROM_AM_SVD_THREADS to override SVD threading.", RuntimeWarning)
+        return 1
+    if hasattr(os, "sched_getaffinity"):
+        available = len(os.sched_getaffinity(0))
+    else:
+        available = os.cpu_count() or 1
+    return min(physical_cores, available)
+
+
+def _svd_thread_count():
+    override = os.environ.get("ROM_AM_SVD_THREADS")
+    if override is not None:
+        try:
+            threads = int(override)
+        except ValueError as exc:
+            raise ValueError("ROM_AM_SVD_THREADS must be a positive integer") from exc
+        if threads < 1:
+            raise ValueError("ROM_AM_SVD_THREADS must be a positive integer")
+        return threads
+
+    return _physical_core_count()
 
 
 class POD:
@@ -82,10 +131,13 @@ class POD:
 
         if alg == "svd":
             if os_ == 0:
-                u, s, vh = jnp.linalg.svd(X, False)
-                u = np.array(u)
-                s = np.array(s)
-                vh = np.array(vh)
+                # BLAS limits are process-wide; avoid overlapping POD limit scopes.
+                with _svd_lock, _blas_threadpools().limit(limits=_svd_thread_count(), user_api="blas"):
+                    u, s, vh = jnp.linalg.svd(X, False)
+                    # Materialize asynchronous JAX results before restoring the limits.
+                    u = np.array(u)
+                    s = np.array(s)
+                    vh = np.array(vh)
             else:
                 u, s, vh = sp.svd(X, False)
 
